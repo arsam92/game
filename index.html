@@ -1,0 +1,2057 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ASHFALL — In war, no one wins.</title>
+<style>
+:root{
+  --paper:#e6dcc3; --paper-dim:#a89f88; --bg:#0b0b0d; --box:rgba(15,15,18,.93);
+  --line:#3a3a40; --red:#a83232; --red-dark:#5c1f1f; --amber:#c08c3a; --steel:#8194ad;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#070709}
+body{font-family:"Courier New",ui-monospace,Menlo,Consolas,monospace;color:var(--paper);font-size:15px;line-height:1.5}
+#scene{position:fixed;inset:0;display:block}
+#ui{position:fixed;inset:0;pointer-events:none;z-index:5}
+#ui>*{pointer-events:auto}
+.hidden{display:none!important}
+button{font-family:inherit;color:inherit;background:transparent;border:1px solid var(--line);cursor:pointer}
+button:disabled{opacity:.38;cursor:default}
+.hand{border-radius:255px 15px 225px 15px/15px 225px 15px 255px}
+/* ---------- HUD ---------- */
+#hud{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:linear-gradient(rgba(8,8,10,.88),rgba(8,8,10,0));pointer-events:none}
+.hud-group{display:flex;gap:12px;align-items:center;pointer-events:auto}
+#hud-day{font-size:18px;letter-spacing:3px}
+#hud-phase{color:var(--paper-dim);font-size:13px;letter-spacing:2px}
+.res{display:flex;gap:14px;align-items:center}
+.res span{display:flex;gap:5px;align-items:center;font-size:13px}
+.res svg{width:14px;height:14px;fill:var(--paper-dim);color:var(--paper-dim)}
+#btn-mute,#btn-menu{padding:4px 12px;font-size:11px;letter-spacing:1px;color:var(--paper-dim)}
+#btn-mute:hover,#btn-menu:hover{border-color:var(--red);color:var(--paper)}
+/* ---------- character cards ---------- */
+#chars{position:absolute;left:16px;top:64px;display:flex;flex-direction:column;gap:10px;width:236px}
+.card{background:var(--box);border:1px solid var(--line);border-radius:255px 15px 225px 15px/15px 225px 15px 255px;padding:9px 12px}
+.card.dead{opacity:.42;filter:grayscale(1)}
+.cc-head{display:flex;justify-content:space-between;align-items:baseline}
+.cc-name{font-size:16px;letter-spacing:1px}
+.cc-role{color:var(--paper-dim);font-size:10.5px;letter-spacing:1px}
+.bar{display:flex;align-items:center;gap:6px;margin-top:5px}
+.bar svg{width:11px;height:11px;fill:var(--paper-dim);color:var(--paper-dim);flex:none}
+.track{flex:1;height:6px;background:#222226;border-radius:3px;overflow:hidden}
+.fill{height:100%;background:var(--paper-dim);transition:width .6s}
+.bar.b-hp .fill{background:#b9ad93}
+.bar.b-hu .fill{background:var(--amber)}
+.bar.b-mo .fill{background:var(--steel)}
+.bar .fill.bad{background:var(--red)}
+.bval{font-size:10px;color:var(--paper-dim);width:22px;text-align:right}
+.chips{margin-top:5px;font-size:9.5px;letter-spacing:1px;min-height:14px}
+.chip{display:inline-block;border:1px solid var(--red-dark);color:var(--red);padding:0 6px;margin-right:4px;border-radius:9px 3px 10px 3px}
+.chip.neutral{border-color:#3d3d33;color:var(--paper-dim)}
+/* ---------- log ---------- */
+#logbox{position:absolute;right:16px;top:64px;width:252px;background:var(--box);border:1px solid var(--line);border-radius:15px 225px 15px 255px/255px 15px 225px 15px;padding:8px 12px;font-size:11px;color:var(--paper-dim)}
+.log-title{font-size:9.5px;letter-spacing:2px;color:#6d675a;margin-bottom:5px}
+#log{list-style:none}
+#log li{padding:2px 0;border-bottom:1px dashed #26262b}
+#log li:last-child{border-bottom:none;color:var(--paper)}
+/* ---------- panel ---------- */
+#panel{position:absolute;left:50%;transform:translateX(-50%);bottom:16px;width:min(780px,95vw);max-height:54vh;overflow-y:auto;background:var(--box);border:1px solid var(--line);border-radius:255px 15px 225px 15px/15px 225px 15px 255px;padding:14px 20px;scrollbar-width:thin}
+.p-title{font-size:17px;letter-spacing:3px;margin-bottom:6px}
+.p-text{color:#cfc6ad;font-size:13.5px;white-space:pre-wrap;margin-bottom:10px}
+.p-note{color:var(--paper-dim);font-size:11.5px;font-style:italic;margin-bottom:8px}
+.p-line{margin:3px 0;font-size:13px;color:#cfc6ad}
+.p-line.dim{color:var(--paper-dim);font-size:12px}
+.choices{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+.choices.one{grid-template-columns:1fr}
+.choice{text-align:left;padding:9px 13px;background:#101014;border:1px solid var(--line);border-radius:15px 225px 15px 255px/255px 15px 225px 15px;transition:border-color .18s,background .18s,transform .18s;display:block;width:100%}
+.choice:hover:not(:disabled){border-color:var(--red);background:rgba(120,32,32,.16);transform:translateY(-1px)}
+.choice .c-label{font-size:13.5px}
+.choice .c-hint{display:block;font-size:11px;color:var(--paper-dim);margin-top:3px}
+.choice.sel{border-color:var(--amber);background:rgba(192,140,58,.12)}
+.p-continue{margin-top:12px;padding:8px 26px;font-size:14px;letter-spacing:3px}
+.p-continue:hover:not(:disabled){border-color:var(--red);background:rgba(120,32,32,.15)}
+.day-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:6px}
+.day-col h4{font-size:13px;letter-spacing:1px;margin-bottom:6px}
+.day-col .choice{margin-bottom:6px;padding:7px 10px}
+.day-col .c-label{font-size:12px}
+.day-col .c-hint{font-size:10px}
+/* ---------- screens ---------- */
+.screen{position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 42%,rgba(24,24,28,.66),rgba(6,6,8,.95));text-align:center;padding:20px}
+#screen-menu h1{font-size:62px;letter-spacing:.45em;margin-left:.45em;font-weight:700;text-shadow:0 0 24px rgba(0,0,0,.8)}
+.tagline{color:var(--paper-dim);letter-spacing:4px;margin-top:4px;font-size:14px}
+.redline{width:220px;height:2px;background:var(--red);margin:24px auto;transform:rotate(-1.2deg)}
+.menu-btns{display:flex;flex-direction:column;gap:12px;width:250px}
+.menu-btns button{padding:10px;font-size:15px;letter-spacing:3px;border-radius:255px 15px 225px 15px/15px 225px 15px 255px}
+.menu-btns button:hover:not(:disabled){border-color:var(--red);background:rgba(120,32,32,.14)}
+.foot{position:absolute;bottom:18px;color:#6a6456;font-size:11px;letter-spacing:1px}
+.about-box{max-width:660px;text-align:left;background:var(--box);border:1px solid var(--line);border-radius:255px 15px 225px 15px/15px 225px 15px 255px;padding:22px 28px;max-height:82vh;overflow-y:auto;scrollbar-width:thin}
+.about-box h2{font-size:18px;letter-spacing:3px;margin-bottom:12px}
+.about-box p{color:#c9c0a8;font-size:13px;margin:8px 0}
+.about-box b{color:var(--paper)}
+.about-box .k{color:var(--amber)}
+#screen-death{background:#020203}
+#death-name{font-size:42px;letter-spacing:8px}
+#death-sub{color:#6d675a;margin-top:10px;letter-spacing:2px;font-size:13px}
+#death-line{color:#8f8873;margin-top:16px;max-width:560px;font-style:italic}
+#death-continue{margin-top:34px}
+#screen-ending{background:rgba(4,4,6,.97);display:block;overflow-y:auto;padding:40px 20px;scrollbar-width:thin}
+.ending-inner{max-width:720px;margin:0 auto;text-align:left}
+.end-title{font-size:30px;letter-spacing:8px;margin:10px 0 20px}
+.ending-inner p{color:#c9c0a8;margin:10px 0;font-size:13.5px}
+.er-title{font-size:12px;letter-spacing:3px;color:#8f8873;margin:24px 0 8px;border-bottom:1px dashed #33333a;padding-bottom:4px}
+.er-item{font-size:12.5px;color:#a89f88;padding:2px 0}
+.surv-item{font-size:13px;padding:5px 0;border-bottom:1px dashed #26262b}
+.surv-item.dead{color:#9a6a6a}
+.end-closing{margin-top:28px;font-size:16px;letter-spacing:2px}
+.end-btns{margin:26px 0 40px;display:flex;gap:14px}
+.end-btns button{padding:10px 26px;letter-spacing:2px;border-radius:255px 15px 225px 15px/15px 225px 15px 255px}
+.end-btns button:hover{border-color:var(--red);background:rgba(120,32,32,.14)}
+/* ---------- fade ---------- */
+#fade{position:fixed;inset:0;background:#000;z-index:30;opacity:1;transition:opacity .75s ease;pointer-events:none;display:flex;align-items:center;justify-content:center}
+#fade-text{font-size:22px;letter-spacing:8px;color:var(--paper-dim)}
+@media (max-width:1150px){#logbox{display:none}}
+@media (max-width:960px){#chars{transform:scale(.82);transform-origin:top left}.day-cols{grid-template-columns:1fr 1fr}}
+@media (max-width:640px){#chars{display:none}.day-cols{grid-template-columns:1fr}.choices{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+<div id="ui">
+  <div id="hud" class="hidden">
+    <div class="hud-group"><span id="hud-day">DAY 1</span><span id="hud-phase">· MORNING</span></div>
+    <div class="hud-group res" id="hud-res"></div>
+    <div class="hud-group">
+      <button id="btn-mute" class="hand">sound: on</button>
+      <button id="btn-menu" class="hand">menu</button>
+    </div>
+  </div>
+  <div id="chars" class="hidden"></div>
+  <div id="logbox" class="hidden"><div class="log-title">— SCRATCHED ON THE WALL —</div><ul id="log"></ul></div>
+  <div id="panel" class="hidden"></div>
+</div>
+
+<div id="screen-menu" class="screen">
+  <h1>ASHFALL</h1>
+  <div class="tagline">IN WAR, NO ONE WINS.</div>
+  <div class="redline"></div>
+  <div class="menu-btns">
+    <button id="btn-new" class="hand">NEW GAME</button>
+    <button id="btn-continue" class="hand">CONTINUE</button>
+    <button id="btn-about" class="hand">ABOUT</button>
+  </div>
+  <div class="foot">a single-file survival drama &mdash; everything you see and hear is drawn and synthesized by your own browser</div>
+</div>
+
+<div id="screen-about" class="screen hidden">
+  <div class="about-box hand">
+    <h2>HOW TO SURVIVE</h2>
+    <p><b>MORNING.</b> Assign one task to each survivor: rest, repair the house, search downstairs for food, craft tools, care for the wounded, or stand guard. Guards make night raids far less likely.</p>
+    <p><b>DUSK.</b> Supper, and then the city knocks. Every event offers choices. Choices are immediate and <b>irreversible</b> &mdash; people remember, and the city remembers.</p>
+    <p><b>NIGHT.</b> Send one survivor out to a location: an abandoned house, the hospital, the checkpoint, or a family home that is not empty. Every place hides loot, witnesses and prices. The one who stays home might face a raid.</p>
+    <p><b>NEEDS.</b> <span class="k">Health</span> at 0 is death, and death is permanent. <span class="k">Hunger</span> above 80 becomes illness. <span class="k">Morale</span> under 20 becomes depression, and depression makes people useless.</p>
+    <p><b>RESOURCES.</b> Food, medicine, parts (salvage), tools (crafted from parts) and the shelter itself (repaired with parts, 0&ndash;5).</p>
+    <p><b>THE STORY.</b> Five threads weave through the siege: a hidden hospital that heals at a price, a lost child, a neighbor who informs, a missing sister, and the last train out on day 30. Pull one thread and the others move.</p>
+    <p><b>DEATHS &amp; ENDINGS.</b> The game autosaves at every phase. Nobody dies instantly from one mistake &mdash; but everything adds up. There is more than one way out, and more than one way to survive.</p>
+    <p style="margin-top:14px;color:#6d675a">Inspired by the siege of a city that could be any city. In war, no one wins.</p>
+    <div style="text-align:center;margin-top:16px"><button id="btn-about-back" class="p-continue hand">BACK</button></div>
+  </div>
+</div>
+
+<div id="screen-death" class="screen hidden">
+  <div id="death-name"></div>
+  <div id="death-sub"></div>
+  <div id="death-line"></div>
+  <button id="death-continue" class="p-continue hand">GO ON</button>
+</div>
+
+<div id="screen-ending" class="screen hidden"><div class="ending-inner" id="ending-body"></div></div>
+
+<div id="fade"><div id="fade-text"></div></div>
+<script>
+'use strict';
+(function () {
+
+/* ================================================================
+   ASHFALL — a single-file survival drama
+   modules: core / content / flow / ui / canvas
+   ================================================================ */
+
+/* ---------------- utils ---------------- */
+function byId(id) { return document.getElementById(id); }
+function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+function rand(a, b) { return a + Math.random() * (b - a); }
+function randi(a, b) { return Math.floor(a + Math.random() * (b - a + 1)); }
+function chance(p) { return Math.random() < p; }
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+/* ---------------- state ---------------- */
+const SAVE_KEY = 'ashfall.save.v1';
+
+function freshState() {
+  return {
+    v: 1,
+    phase: 'day',            // day | dayResult | dusk | duskResult | night | nightResult
+    day: 1,
+    res: { food: 4, meds: 1, parts: 3, tools: 0, shelter: 1 },
+    humanity: 50,
+    chars: [
+      { id: 'vera', name: 'Vera', age: 34, role: 'Surgeon', trait: 'doctor',
+        trauma: 'She amputated a boy\u2019s leg on a kitchen table during the first shelling. She kept his shoe.',
+        hp: 80, hunger: 45, morale: 55, sick: false, injured: false, injuryDays: 0,
+        depressed: false, dead: false, cause: '', deathDay: 0 },
+      { id: 'marko', name: 'Marko', age: 41, role: 'Mechanic', trait: 'deserter',
+        trauma: 'He crossed the river the night the bridge fell and left five men in the trench. He hears their boots when he closes his eyes.',
+        hp: 70, hunger: 55, morale: 35, sick: false, injured: false, injuryDays: 0,
+        depressed: false, dead: false, cause: '', deathDay: 0 },
+      { id: 'anya', name: 'Anya', age: 17, role: 'Student', trait: 'thief',
+        trauma: 'She locked the pharmacy door with the pharmacist inside and took the insulin. Her mother died anyway.',
+        hp: 85, hunger: 40, morale: 50, sick: false, injured: false, injuryDays: 0,
+        depressed: false, dead: false, cause: '', deathDay: 0 }
+    ],
+    child: null,             // {hunger, hp, sick, sickDays, starve}
+    flags: {},
+    arcs: { sava: 0, traitor: 0, mira: 0, train: 0 },
+    usedDusk: {},
+    assign: {},
+    supperLines: [],
+    lastLines: [],
+    duskEventId: null,
+    night: null,
+    log: [],
+    decisions: [],
+    settings: { muted: false }
+  };
+}
+let G = freshState();
+
+/* visual-only volatile state (never saved) */
+const FX = { shake: 0, mode: 'menu', chars: {} };
+
+/* death queue + continuation of the flow after a memorial screen */
+const Death = {
+  queue: [],
+  after: null,
+  check: function () {
+    if (this.queue.length === 0) return false;
+    this.showNext();
+    return true;
+  },
+  showNext: function () {
+    const ch = this.queue.shift();
+    if (!ch) return;
+    showDeathScreen(ch);
+  },
+  continueFlow: function () {
+    if (this.queue.length > 0) { this.showNext(); return; }
+    if (aliveCount() === 0) { showEnding('silent'); return; }
+    const f = this.after; this.after = null;
+    if (f) f();
+  }
+};
+function setNext(fn) { Death.after = fn; }
+
+/* ---------------- helpers ---------------- */
+function getChar(id) { for (let i = 0; i < G.chars.length; i++) { if (G.chars[i].id === id) return G.chars[i]; } return null; }
+function alive() { return G.chars.filter(function (c) { return !c.dead; }); }
+function aliveCount() { return alive().length; }
+function logLine(s) { G.log.push('D' + G.day + ' \u2014 ' + s); if (G.log.length > 30) G.log.shift(); if (typeof renderLog === 'function') renderLog(); }
+function decide(t) { G.decisions.push({ d: G.day, t: t }); }
+function humanity(n) { G.humanity = clamp(G.humanity + n, 0, 100); }
+function addRes(k, n) { G.res[k] = Math.max(0, G.res[k] + n); }
+function hp(ch, n, why) { if (!ch || ch.dead) return; ch.hp = clamp(ch.hp + n, 0, 100); if (ch.hp <= 0) die(ch, why || 'wounds and weakness'); }
+function morale(ch, n) { if (!ch || ch.dead) return; ch.morale = clamp(ch.morale + n, 0, 100); }
+function hungerUp(ch, n) { if (!ch || ch.dead) return; ch.hunger = clamp(ch.hunger + n, 0, 100); }
+function allMorale(n) { alive().forEach(function (c) { morale(c, n); }); }
+function lowestHpChar() { const a = alive(); let t = a[0]; for (let i = 1; i < a.length; i++) { if (a[i].hp < t.hp) t = a[i]; } return t; }
+function wound(ch, lo, hi, why) { if (!ch || ch.dead) return; hp(ch, -randi(lo, hi), why); ch.injured = true; ch.injuryDays = 2; }
+
+const MEMORIAL = {
+  vera: 'She mended what she could. The rest she carried.',
+  marko: 'He stopped running on the day he finally stood still.',
+  anya: 'She kept her hands closed, so nothing more could be taken.'
+};
+
+function die(ch, cause) {
+  if (!ch || ch.dead) return;
+  ch.dead = true; ch.hp = 0; ch.cause = cause; ch.deathDay = G.day;
+  logLine(ch.name + ' did not come back. ' + MEMORIAL[ch.id]);
+  FX.shake = 14; Snd.sting();
+  Death.queue.push(ch);
+  if (G.flags.bloodRooms && G.flags.bloodRooms.length < 2) G.flags.bloodRooms.push(pick(['kitchen', 'upper']));
+  else if (!G.flags.bloodRooms) G.flags.bloodRooms = [pick(['kitchen', 'upper'])];
+}
+
+function childPresent() { return !!G.child; }
+function childDie(cause) {
+  if (!G.child) return;
+  G.child = null; G.flags.childFate = 'dead';
+  logLine('Nika is gone. ' + cause);
+  allMorale(-15);
+  decide('We could not keep Nika alive.');
+}
+
+/* ---------------- save / load ---------------- */
+function saveGame() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(G)); } catch (e) { /* storage unavailable — keep playing */ } }
+function clearSave() { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} }
+function hasSave() { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } }
+function loadGame() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return false;
+    const data = JSON.parse(raw);
+    if (!data || !data.chars || !data.chars.length) return false;
+    const s = freshState();
+    Object.keys(s).forEach(function (k) { if (data[k] !== undefined) s[k] = data[k]; });
+    G = s;
+    return true;
+  } catch (e) { return false; }
+}
+
+/* ---------------- synthesized audio (Web Audio API) ---------------- */
+const Snd = {
+  ctx: null, master: null, amb: null,
+  init: function () {
+    if (this.ctx) { this.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = G.settings.muted ? 0 : 0.5;
+      this.master.connect(this.ctx.destination);
+      this.startAmbient();
+    } catch (e) { this.ctx = null; }
+  },
+  resume: function () { try { if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); } catch (e) {} },
+  noiseBuffer: function () {
+    if (this._nb) return this._nb;
+    const len = this.ctx.sampleRate * 2;
+    const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    this._nb = buf;
+    return buf;
+  },
+  startAmbient: function () {
+    try {
+      const c = this.ctx;
+      /* wind: filtered noise */
+      const wind = c.createBufferSource(); wind.buffer = this.noiseBuffer(); wind.loop = true;
+      const wf = c.createBiquadFilter(); wf.type = 'lowpass'; wf.frequency.value = 300;
+      const wg = c.createGain(); wg.gain.value = 0.05;
+      wind.connect(wf); wf.connect(wg); wg.connect(this.master); wind.start();
+      /* rain: bandpass noise (night only) */
+      const rain = c.createBufferSource(); rain.buffer = this.noiseBuffer(); rain.loop = true;
+      const rf = c.createBiquadFilter(); rf.type = 'bandpass'; rf.frequency.value = 2600; rf.Q.value = 0.6;
+      const rg = c.createGain(); rg.gain.value = 0;
+      rain.connect(rf); rf.connect(rg); rg.connect(this.master); rain.start();
+      /* drone: low sine with slow LFO */
+      const dr = c.createOscillator(); dr.type = 'sine'; dr.frequency.value = 46;
+      const dg = c.createGain(); dg.gain.value = 0.02;
+      const lfo = c.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 0.09;
+      const lg = c.createGain(); lg.gain.value = 0.012;
+      lfo.connect(lg); lg.connect(dg.gain);
+      dr.connect(dg); dg.connect(this.master); dr.start(); lfo.start();
+      this.amb = { wind: wg, rain: rg, drone: dg };
+    } catch (e) { this.amb = null; }
+  },
+  setScene: function (mode) {
+    if (!this.ctx || !this.amb) return;
+    try {
+      const t = this.ctx.currentTime;
+      const ramp = function (node, v) { node.gain.cancelScheduledValues(t); node.gain.setTargetAtTime(v, t, 1.2); };
+      if (mode === 'night') { ramp(this.amb.wind, 0.04); ramp(this.amb.rain, 0.11); ramp(this.amb.drone, 0.05); }
+      else if (mode === 'dusk') { ramp(this.amb.wind, 0.05); ramp(this.amb.rain, 0.03); ramp(this.amb.drone, 0.04); }
+      else if (mode === 'day') { ramp(this.amb.wind, 0.06); ramp(this.amb.rain, 0.0); ramp(this.amb.drone, 0.02); }
+      else { ramp(this.amb.wind, 0.035); ramp(this.amb.rain, 0.06); ramp(this.amb.drone, 0.03); }
+    } catch (e) {}
+  },
+  blip: function () {
+    if (!this.ctx || G.settings.muted) return;
+    try {
+      const t = this.ctx.currentTime;
+      const o = this.ctx.createOscillator(); o.type = 'triangle';
+      o.frequency.setValueAtTime(520, t); o.frequency.exponentialRampToValueAtTime(300, t + 0.07);
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(0.08, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+      o.connect(g); g.connect(this.master); o.start(t); o.stop(t + 0.1);
+    } catch (e) {}
+  },
+  boom: function () {
+    if (!this.ctx || G.settings.muted) return;
+    try {
+      const t = this.ctx.currentTime;
+      const src = this.ctx.createBufferSource(); src.buffer = this.noiseBuffer();
+      const f = this.ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.setValueAtTime(400, t); f.frequency.exponentialRampToValueAtTime(60, t + 0.6);
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(0.5, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
+      src.connect(f); f.connect(g); g.connect(this.master); src.start(t); src.stop(t + 0.9);
+      const o = this.ctx.createOscillator(); o.type = 'sine';
+      o.frequency.setValueAtTime(90, t); o.frequency.exponentialRampToValueAtTime(28, t + 0.7);
+      const g2 = this.ctx.createGain();
+      g2.gain.setValueAtTime(0.4, t); g2.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
+      o.connect(g2); g2.connect(this.master); o.start(t); o.stop(t + 0.9);
+    } catch (e) {}
+  },
+  sting: function () {
+    if (!this.ctx || G.settings.muted) return;
+    try {
+      const t = this.ctx.currentTime;
+      const o = this.ctx.createOscillator(); o.type = 'sine';
+      o.frequency.setValueAtTime(200, t); o.frequency.exponentialRampToValueAtTime(52, t + 1.4);
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(0.28, t); g.gain.exponentialRampToValueAtTime(0.001, t + 1.6);
+      o.connect(g); g.connect(this.master); o.start(t); o.stop(t + 1.7);
+    } catch (e) {}
+  },
+  toggleMute: function () {
+    G.settings.muted = !G.settings.muted;
+    if (this.ctx && this.master) {
+      try {
+        const t = this.ctx.currentTime;
+        this.master.gain.cancelScheduledValues(t);
+        this.master.gain.setTargetAtTime(G.settings.muted ? 0 : 0.5, t, 0.1);
+      } catch (e) {}
+    }
+  }
+};
+
+/* ================================================================
+   CONTENT — day actions
+   ================================================================ */
+const ACTIONS = [
+  { id: 'rest', name: 'Rest', hint: 'wounds close · spirits lift',
+    can: function () { return true; }, need: '',
+    run: function (ch, out) {
+      hp(ch, 6 + (ch.depressed ? 0 : 2)); morale(ch, 7 + (ch.depressed ? 0 : 2)); hungerUp(ch, 2);
+      out.push(ch.name + ' slept in fits, dreaming of ordinary mornings.');
+      if (ch.injured && chance(0.45)) { ch.injured = false; ch.injuryDays = 0; out.push('The wounds have closed a little.'); }
+    } },
+  { id: 'repair', name: 'Repair the house', hint: 'shelter up · fewer raids · 1 part',
+    can: function () { return G.res.parts >= 1 && G.res.shelter < 5; }, need: 'needs 1 part · shelter is solid',
+    run: function (ch, out) {
+      addRes('parts', -1);
+      const gain = (ch.trait === 'deserter') ? 2 : 1;
+      G.res.shelter = clamp(G.res.shelter + gain, 0, 5);
+      morale(ch, 3); hungerUp(ch, 4);
+      out.push(ch.name + (gain > 1 ? ' patched the walls twice over.' : ' boarded the broken window. The house stands a little prouder.'));
+    } },
+  { id: 'forage', name: 'Search downstairs', hint: 'food and salvage · risk of collapse',
+    can: function () { return true; }, need: '',
+    run: function (ch, out) {
+      hungerUp(ch, 6);
+      const f = chance(0.75) ? randi(1, 2) : 0;
+      const p = chance(0.4) ? 1 : 0;
+      addRes('food', f); addRes('parts', p);
+      out.push(ch.name + ' came back up ' + (f > 0 ? 'with ' + f + ' can' + (f > 1 ? 's' : '') : 'with empty hands') + (p > 0 ? ' and some salvage.' : '.'));
+      if (chance(0.2)) { wound(ch, 6, 14, 'the collapsed floor'); out.push('A joist gave way under ' + ch.name + '. The house is eating itself.'); }
+    } },
+  { id: 'craft', name: 'Craft tools', hint: 'tools help at night · 2 parts',
+    can: function () { return G.res.parts >= 2 && G.res.tools < 3; }, need: 'needs 2 parts · tools are enough',
+    run: function (ch, out) {
+      addRes('parts', -2); addRes('tools', 1);
+      morale(ch, 2); hungerUp(ch, 4);
+      out.push('A pry-bar, a hook, a knife on a broomstick. ' + ch.name + ' calls it "the profession".');
+    } },
+  { id: 'care', name: 'Care for the wounded', hint: 'heals the worst off · 1 med',
+    can: function () { return G.res.meds >= 1 && alive().some(function (c) { return c.hp < 100 || c.sick || c.injured; }); },
+    need: 'needs 1 med · nobody needs tending',
+    run: function (ch, out) {
+      addRes('meds', -1);
+      let t = lowestHpChar();
+      if (t === ch && alive().length > 1) { const others = alive().filter(function (c) { return c !== ch; }); let l = others[0]; others.forEach(function (c) { if (c.hp < l.hp) l = c; }); if (l.hp < t.hp) t = l; }
+      const heal = (ch.trait === 'doctor') ? 32 : 18;
+      hp(t, heal);
+      if (t.sick && chance(ch.trait === 'doctor' ? 0.8 : 0.5)) { t.sick = false; out.push('The fever lets go of ' + t.name + '.'); }
+      morale(t, 5); morale(ch, 2); hungerUp(ch, 4);
+      out.push((ch.trait === 'doctor' ? 'Vera works with thread, vodka and certainty.' : ch.name + ' does what can be done without a doctor\u2019s hands.') + ' ' + t.name + ' mends.');
+    } },
+  { id: 'guard', name: 'Stand guard', hint: 'guards the house tonight',
+    can: function () { return true; }, need: '',
+    run: function (ch, out) {
+      morale(ch, -2); hungerUp(ch, 5);
+      out.push(ch.name + ' sat by the door with a crowbar and the whole night for company.');
+    } }
+];
+const ACTION_BY_ID = {};
+ACTIONS.forEach(function (a) { ACTION_BY_ID[a.id] = a; });
+
+/* ================================================================
+   CONTENT — dusk events (moral choices, irreversible)
+   ================================================================ */
+const SAFE_NIGHTS = [
+  'The city lets you pass like a held breath let out. Home by the third bell of your own heartbeat.',
+  'Only the wind, working the wire. The night stays empty and enormous.',
+  'You come back cold to the bone, smelling of frost and other people\u2019s attics. Nobody stopped you. Nobody saw.'
+];
+
+const EVENTS = [
+  /* ---- prio: the child is sick ---- */
+  { id: 'nika_sick', prio: true, weight: 0,
+    cond: function () { return childPresent() && !G.child.sick && (G.day - (G.flags.childDay || 1)) >= 3 && !G.usedDusk.nika_sick; },
+    title: 'Two in the morning',
+    text: function () { return 'Nika is burning. She curls around her own heat like a comma, whispering a name that belongs to nobody here. The house has exactly one candle and, somewhere, a bottle of pills that is either enough or is not.'; },
+    choices: [
+      { label: 'Spend the medicine.', hint: 'meds \u22121', cond: function () { return G.res.meds >= 1; },
+        run: function () { addRes('meds', -1); G.child.sick = false; G.usedDusk.nika_sick = true; allMorale(5); humanity(3); decide('Spent our medicine on Nika.'); return 'By dawn the fever breaks into sweat and sleep. Anya sits beside her reading aloud from a book with half its pages gone, making up the missing endings as she goes.'; } },
+      { label: 'Carry her to Dr. Sava.', hint: 'the hidden hospital', cond: function () { return G.arcs.sava === 3; },
+        run: function () { G.child.sick = false; G.usedDusk.nika_sick = true; allMorale(4); humanity(2); return 'The old man works on her by candlelight, all thumbs and tenderness. "Basement children burn hottest," he says. "It is the waiting that does it, not the sickness."'; } },
+      { label: 'Wait it out with cold water.', hint: 'a gamble with small stakes and a small life',
+        run: function () { G.child.sick = true; G.child.sickDays = 0; G.usedDusk.nika_sick = true; allMorale(-6); decide('Could not \u2014 or would not \u2014 treat Nika\u2019s fever.'); return 'For three days the house will hold its breath between her breaths. Some fevers break. The arithmetic of this city says not all of them do.'; } }
+    ] },
+  /* ---- prio: Pava reveals the informer ---- */
+  { id: 'pava_tells', prio: true, weight: 0,
+    cond: function () { return (G.flags.pavaFed || 0) >= 1 && G.arcs.traitor === 1 && !G.usedDusk.pava_tells; },
+    title: 'The washed can',
+    text: function () { return 'Pava comes at dusk with your empty can, washed, dried, refolded around nothing. She stays in the doorway, choosing words the way soldiers choose footsteps. "Branko walks to the white-armband post every evening," she whispers. "He comes back with cigarettes. You have people upstairs. Think."'; },
+    choices: [
+      { label: 'Thank her. Watch Branko.', hint: 'knowledge, and its weight',
+        run: function () { G.arcs.traitor = 2; G.usedDusk.pava_tells = true; decide('Learned that Branko informs to the white armbands.'); humanity(1); return 'For three evenings you watch from the attic gap. On the third, two houses from the wire, Branko stops and talks with his back very straight. He is not selling cigarettes.'; } },
+      { label: 'Refuse to believe it. He brought salt.', hint: 'kindness, wagered',
+        run: function () { G.usedDusk.pava_tells = true; allMorale(-2); return 'Pava leaves the can on the step. Kindness has made you soft, her look says, and the city eats the soft first. Maybe. Or maybe it is the other way around.'; } }
+    ] },
+  /* ---- prio: confront the informer ---- */
+  { id: 'traitor_confront', prio: true, weight: 0,
+    cond: function () { return G.arcs.traitor === 2 && !G.usedDusk.traitor_confront; },
+    title: 'The stairwell',
+    text: function () { return 'You have the proof \u2014 or something better, a pattern: raids after his visits, cigarettes on the stairs, the whistling. Tonight Branko is alone in the stairwell. Your hand fits easily around the back of his collar. It would fit just as easily around a knife.'; },
+    choices: [
+      { label: 'Tell the street. Let them judge.', hint: 'the old law of sieges',
+        run: function () { G.arcs.traitor = 3; G.flags.brankoGone = true; G.usedDusk.traitor_confront = true; allMorale(-8); humanity(-2); decide('Gave Branko to the street\u2019s justice.'); return 'The neighbors take him to the wire at dawn \u2014 "for questioning", they say. He does not come back. The raids stop. So does the whistling, and a dozen small sounds you never knew were kindness. Nobody says his name again.'; } },
+      { label: 'Speak to him alone. Man to man.', hint: 'no witnesses, no mercy either',
+        run: function () { G.arcs.traitor = 4; G.flags.brankoLeaves = G.day + 3; G.usedDusk.traitor_confront = true; decide('Confronted Branko privately.'); return 'He does not deny it. "They have my daughters\u2019 files," he says, straightening his jacket with both hands, like a man dressing for a job. "It stops," you say. He looks at the wall above your head and nods.'; } },
+      { label: 'Blackmail him. Salt has a price.', hint: 'parts +2 · he keeps informing',
+        run: function () { G.arcs.traitor = 5; addRes('parts', 2); G.usedDusk.traitor_confront = true; humanity(-6); decide('Made Branko pay for our silence.'); return 'Every four days now, a knock, a package. He never meets your eyes. You tell yourself a fed informer is a loyal informer. The house eats better than it sleeps.'; } },
+      { label: 'Watch. Wait. Do nothing yet.', hint: 'live with it',
+        run: function () { G.arcs.traitor = 6; G.usedDusk.traitor_confront = true; decide('Decided to live with the informer next door.'); return 'Knowledge you do not use is just weight. You start sleeping with your boots on. So does everyone else.'; } }
+    ] },
+  /* ---- prio: Ema was robbed ---- */
+  { id: 'ema_robbed', prio: true, weight: 0,
+    cond: function () { return G.flags.emaRobbed && !G.flags.emaReturned && !G.usedDusk.ema_robbed; },
+    title: 'The empty cabinet',
+    text: function () { return 'Ema stands at the door in her nightgown, in the snow, holding nothing at all, which is somehow worse than holding evidence. "I counted them," she says. "Twelve. I counted them every morning, like prayers."'; },
+    choices: [
+      { label: 'Return what is left. Head bowed.', hint: 'meds \u22121', cond: function () { return G.res.meds >= 1; },
+        run: function () { addRes('meds', -1); G.flags.emaReturned = true; G.flags.emaFriendly = true; G.usedDusk.ema_robbed = true; humanity(5); allMorale(-2); decide('Tried to give Ema back what we stole.'); return 'She does not take the pills. She looks at them, then at you, then leaves them on the step. "Keep them," she says. "Now you will remember for me." The door of her house stays open all winter.'; } },
+      { label: 'Say it was the soldiers.', hint: 'a counterfeit mercy',
+        run: function () { G.flags.emaReturned = true; G.usedDusk.ema_robbed = true; humanity(-4); const an = getChar('anya'); if (an && !an.dead) morale(an, -4); return 'She nods slowly, accepting the lie the way you accept counterfeit money when the alternative is nothing. Nobody believes it. Now she flinches from your door.'; } },
+      { label: 'Say nothing. Shut the door.', hint: '',
+        run: function () { G.usedDusk.ema_robbed = true; humanity(-6); allMorale(-4); decide('Shut the door on Ema.'); return 'The stairwell is quiet, then not. What comes through the door is not shouting, which would be better. It is the sound of an old woman trying to remember how to cry quietly.'; } }
+    ] },
+  /* ---- prio: hunger thief ---- */
+  { id: 'hunger_thief', prio: true, weight: 0,
+    cond: function () { return alive().some(function (c) { return c.hunger > 85; }) && !G.usedDusk.hunger_thief; },
+    title: 'Three in the morning',
+    text: function () { return 'Anya catches Marko at the stash box, a can under his arm, caught like a boy. He stands in the dark in his undershirt, a forty-one-year-old man. "I was checking the seals," he lies, terribly.'; },
+    choices: [
+      { label: 'Give him the can. Say nothing.', hint: '',
+        run: function () { addRes('food', -1); G.usedDusk.hunger_thief = true; const mk = getChar('marko'), an = getChar('anya'); if (mk && !mk.dead) morale(mk, 8); if (an && !an.dead) morale(an, 3); humanity(2); decide('Let Marko keep the can he stole.'); return 'He eats it standing, crying without any sound at all. After that, Marko would walk into fire for this house. He does not ask again.'; } },
+      { label: 'Lock the box. Divide portions by the book.', hint: '',
+        run: function () { G.usedDusk.hunger_thief = true; const mk = getChar('marko'); if (mk && !mk.dead) morale(mk, -6); allMorale(-3); decide('Locked the food box against our own.'); return 'The lock costs two good bolts. Hunger stops being a feeling and becomes a schedule. Everyone measures everyone with their eyes now.'; } },
+      { label: 'Say nothing. Walk away.', hint: 'some mercies work unwitnessed',
+        run: function () { G.usedDusk.hunger_thief = true; const mk = getChar('marko'), an = getChar('anya'); if (mk && !mk.dead) morale(mk, 4); if (an && !an.dead) morale(an, -4); humanity(1); return 'You go back to bed and listen to the can opening in the dark. Anya\u2019s eyes at breakfast say she knows that you know. Nobody poisons the morning with it.'; } }
+    ] },
+
+  /* ---- random pool ---- */
+  { id: 'pava', once: true, weight: 10, minDay: 2,
+    title: 'A knock at dusk',
+    text: function () { return 'Pava from the second floor stands in the stairwell, thinner than the winter. "My boy has a fever," she says. "I have nothing left to give him. You always smell of soup up here." She stares at her hands, ashamed of the wanting.'; },
+    choices: [
+      { label: 'Give half of tonight\u2019s supper.', hint: 'food \u22121', cond: function () { return G.res.food >= 1; },
+        run: function () { addRes('food', -1); humanity(4); G.flags.pavaFed = (G.flags.pavaFed || 0) + 1; allMorale(6); decide('Fed Pava\u2019s boy instead of ourselves.'); return 'She holds the can against her chest the way people hold candles. "There are still people in this city," she says \u2014 gratitude, or a question we will have to answer someday.'; } },
+      { label: 'Give everything. Let the boy eat.', hint: 'food \u22122', cond: function () { return G.res.food >= 2; },
+        run: function () { addRes('food', -2); humanity(8); G.flags.pavaFed = (G.flags.pavaFed || 0) + 2; allMorale(9); decide('Gave Pava everything. Tonight we go hungry.'); return 'Pava tries to refuse, then stops pretending. "The boy will outlive us all," she says, and for once the thought does not feel cruel.'; } },
+      { label: 'Refuse. Our own are starving.', hint: '',
+        run: function () { humanity(-4); allMorale(-5); decide('Turned Pava away.'); return 'The stairwell swallows her footsteps one by one. Nobody speaks at supper. The soup tastes like the door we closed.'; } }
+    ] },
+  { id: 'milan', once: true, weight: 9, minDay: 2,
+    title: 'At the door, bleeding',
+    text: function () { return 'He collapses against the doorframe at dusk \u2014 a soldier, nineteen maybe, blood dried black along his side. "Not inside," he whispers. "Just... out of the rain." His rifle is gone. His eyes are still open.'; },
+    choices: [
+      { label: 'Bring him in. Vera looks at him.', hint: 'meds \u22121', cond: function () { return G.res.meds >= 1 && getChar('vera') && !getChar('vera').dead; },
+        run: function () { addRes('meds', -1); humanity(5); allMorale(4); G.flags.milanSavedGuard = 4; G.flags.milanDay = G.day; decide('Took the dying soldier Milan in.'); return 'Vera works until the small hours with thread and vodka. He will live. Marko says nothing, but he sleeps facing the door that night.'; } },
+      { label: 'Turn him away. We cannot feed ghosts.', hint: '',
+        run: function () { humanity(-3); allMorale(-6); decide('Left Milan at the door.'); return 'He does not beg. That is the worst of it. In the morning there is a dark shape at the threshold, and Marko spends an hour digging in the frozen yard.'; } },
+      { label: 'Take his boots. And his rations.', hint: 'food +2 · parts +1 · a stain',
+        run: function () { addRes('food', 2); addRes('parts', 1); humanity(-8); allMorale(-8); const an = getChar('anya'); if (an && !an.dead) morale(an, -12); G.flags.milanRobbed = true; decide('Robbed a dying man at our door.'); return 'Anya counts the cans without meeting anyone\u2019s eyes. The boots fit Marko. Nobody says the word "looter", but the house wears it now, quietly, like a smell.'; } }
+    ] },
+  { id: 'radio', once: true, weight: 7, minDay: 4,
+    title: 'Numbers on the wind',
+    text: function () { return 'The crystal radio hisses through languages, then catches a voice reading numbers and street names. A ceasefire, it says. Talks. And after the lists: "Northbound freight, thirty-first platform, will take refugees. Those who can pay." The hiss swallows the rest.'; },
+    choices: [
+      { label: 'Pass the news around the table.', hint: '',
+        run: function () { allMorale(6); G.arcs.train = Math.max(G.arcs.train, 1); decide('Heard of the northbound train.'); return 'Marko taps the table with two fingers, like a man counting stations. Thirty-first platform. It is a word you can live on for a week: "maybe".'; } },
+      { label: 'Say nothing. Hope is rationed here.', hint: '',
+        run: function () { allMorale(2); G.arcs.train = Math.max(G.arcs.train, 1); return 'You keep it in your chest like a coal. At night you catch Anya drawing a train on the wallpaper with her finger.'; } },
+      { label: 'Smash the radio. Liars.', hint: '',
+        run: function () { allMorale(-4); G.arcs.train = Math.max(G.arcs.train, 1); return 'The crack of the housing feels good for exactly one second. The numbers stay in the room anyway. Numbers always do.'; } }
+    ] },
+  { id: 'shelling', weight: 6, minDay: 5,
+    title: 'The whistling',
+    text: function () { return 'It starts without a face \u2014 just air, torn, somewhere above the roofline. Then the world becomes a fist.'; },
+    choices: [
+      { label: 'Get everyone to the stairwell.', hint: 'the house takes the hits',
+        run: function () { allMorale(-5); FX.shake = 16; Snd.boom(); const p = G.res.shelter >= 3 ? 0.08 : 0.15; const hit = alive().filter(function () { return chance(p); }); hit.forEach(function (c) { wound(c, 8, 16, 'the shelling'); }); return 'You count the impacts by the dust falling from the beams. Twelve. Fourteen. Then the whistling moves on, bored, elsewhere. The house is still standing. So are you, mostly.' + (hit.length ? ' Not everyone is.' : ''); } },
+      { label: 'Stay put. Moving kills too.', hint: 'risky',
+        run: function () { allMorale(-8); FX.shake = 18; Snd.boom(); const hit = alive().filter(function () { return chance(0.25); }); hit.forEach(function (c) { wound(c, 10, 22, 'the shelling'); }); return 'The ceiling holds, then holds again, then something bursts two rooms away and the house screams in splinters.' + (hit.length ? ' Someone is bleeding.' : ''); } }
+    ] },
+  { id: 'scarf', once: true, weight: 7, minDay: 5,
+    cond: function () { const v = getChar('vera'); return v && !v.dead && G.arcs.mira === 0; },
+    title: 'A ribbon of red',
+    text: function () { return 'Vera comes down from the attic holding a scrap of red cloth like a bird with a broken neck. "Mira\u2019s," she says. "I sewed that ribbon on myself, the summer the river smelled normal." Her hands are perfectly steady. That is how you know.'; },
+    choices: [
+      { label: 'We will look for her.', hint: '',
+        run: function () { G.arcs.mira = 1; G.flags.miraState = 'unknown'; const v = getChar('vera'); if (v) morale(v, 10); allMorale(3); decide('Promised Vera we would search for Mira.'); return 'It is a stupid promise in a city where the dead outnumber the living. Vera smiles anyway, and for a week she hums while she works, and nobody minds.'; } },
+      { label: 'The dead do not wear ribbons here.', hint: '',
+        run: function () { G.arcs.mira = 1; G.flags.miraState = 'unknown'; const v = getChar('vera'); if (v) morale(v, -12); decide('Told Vera the truth about the odds.'); return 'Vera folds the ribbon into her pocket, into the pocket it will live in forever. "Of course," she says, in the voice she uses for the dying.'; } }
+    ] },
+  { id: 'milan_returns', once: true, weight: 6, minDay: 4,
+    cond: function () { return !!G.flags.milanDay && G.day >= G.flags.milanDay + 4; },
+    title: 'A debt, repaid light',
+    text: function () { return 'Milan limps in without knocking, grinning around the stitches on his side. He moves like a man whose debt is heavier than his bag. "I asked around," he says. "The thirty-first platform is real. The Rat sells places. And there is a doctor in a basement. I owe you both."'; },
+    choices: [
+      { label: 'Hear everything.', hint: 'parts +2',
+        run: function () { G.arcs.train = Math.max(G.arcs.train, 1); addRes('parts', 2); allMorale(4); return 'He talks for an hour \u2014 rotations, prices, which guards take bribes and which take fingers. When he leaves he leaves the bag too, waving off thanks like smoke. Some debts, he says, are paid better light.'; } },
+      { label: 'Ask only about the doctor.', hint: 'meds +1',
+        run: function () { G.arcs.train = Math.max(G.arcs.train, 1); addRes('meds', 1); return '"Basement of Ward C. Bring him something to splint with," Milan says. "He saves people who bring him something to splint with."'; } },
+      { label: 'Send him away. Visitors are risk.', hint: '',
+        run: function () { allMorale(-3); humanity(-2); return 'He takes the rejection the way soldiers take weather. "Door\u2019s always open," he lies, politely, and is gone. Marko looks at the closed door a long time.'; } }
+    ] },
+  { id: 'probe', once: true, weight: 8, minDay: 4,
+    title: 'A gift of salt',
+    text: function () { return 'Branko from the ground floor brings salt as a gift, which nobody has seen for months. He stays. He asks, gently, who is sick, who is wounded, whether the girl upstairs is "still with you". His eyes move around the room like a man taking inventory.'; },
+    choices: [
+      { label: 'Answer honestly. He is a neighbor.', hint: 'trust, placed badly?',
+        run: function () { G.arcs.traitor = Math.max(G.arcs.traitor, 1); G.flags.probeRisk = 0.09; G.flags.probed = true; humanity(1); decide('Told Branko the truth about the house.'); return 'He nods at everything, kindly, the way a clerk nods at a form. When he is gone, Vera asks why the room suddenly feels drafty.'; } },
+      { label: 'Lie about everything.', hint: '',
+        run: function () { G.arcs.traitor = Math.max(G.arcs.traitor, 1); G.flags.probeRisk = 0.02; G.flags.probed = true; decide('Lied to Branko about the house.'); return 'You lie with the ease of survivors. He believes nothing, suspects everything, and leaves with the salt still on your table \u2014 a gift you will pay for.'; } },
+      { label: 'Refuse to talk. Shut the door.', hint: '',
+        run: function () { G.arcs.traitor = Math.max(G.arcs.traitor, 1); G.flags.probeRisk = 0.05; G.flags.probed = true; return 'The door shuts like a period at the end of a sentence. Through the wall, later, you hear him whistling on the stairs. Whistling travels. So does information.'; } }
+    ] },
+  { id: 'goran', once: true, weight: 6, minDay: 8,
+    cond: function () { const m = getChar('marko'); return m && !m.dead; },
+    title: 'From the trench',
+    text: function () { return 'A shape detaches from the shadows across the street and Marko\u2019s whole body goes rigid. "Goran," he says. "From the trench." Goran is feverish, wild-eyed, carrying his rifle like firewood. "You crossed," Goran says. Not an accusation. Worse \u2014 a fact, said gently.'; },
+    choices: [
+      { label: 'Hide him in the cellar.', hint: 'raids more likely for a while',
+        run: function () { G.flags.goranHidden = true; G.flags.goranDays = G.day + 3; humanity(4); const m = getChar('marko'); if (m) morale(m, 12); decide('Hid Goran, the feverish deserter.'); return 'Marko sits with him all night, saying nothing, passing water. Two men who ran from the same night, one of them still running. In the morning the fever is worse. Or better. It is hard to tell with fevers.'; } },
+      { label: 'Fill his hands and point him on.', hint: 'parts \u22122', cond: function () { return G.res.parts >= 2; },
+        run: function () { addRes('parts', -2); humanity(3); const m = getChar('marko'); if (m) morale(m, 5); decide('Sent Goran on with supplies.'); return 'Goran laughs at the canned heat like it is a joke only soldiers get. He walks north. Marko watches until the snow eats him, then goes inside and cleans his tools for three hours.'; } },
+      { label: 'Turn him away.', hint: '',
+        run: function () { humanity(-3); const m = getChar('marko'); if (m) morale(m, -14); decide('Turned Goran away into the snow.'); return 'Goran does not argue. That is the terrible part \u2014 he just nods, the way men do when the world confirms its reputation. Marko does not come out of his room until noon.'; } }
+    ] },
+  { id: 'smuggler', once: true, weight: 8, minDay: 8,
+    cond: function () { return G.arcs.train >= 1; },
+    title: 'The Rat',
+    text: function () { return 'The Rat smells of kerosene and expensive cigarettes. He spreads a hand-drawn map on your table like a casino dealer. "Thirty-first platform. Northbound, night thirty, before the ceasefire freezes everything solid. Six parts and three days of food a seat. Children ride for two more parts. I don\u2019t do credit. I don\u2019t do refunds."'; },
+    choices: [
+      { label: 'Pay for the seats.', hint: 'parts \u22126 · food \u22123', cond: function () { return G.res.parts >= 6 && G.res.food >= 3; },
+        run: function () { addRes('parts', -6); addRes('food', -3); G.flags.seats = true; G.arcs.train = 2; decide('Paid the Rat for seats on the last train.'); return 'He counts everything twice, bites one coin out of habit though coin is worthless now, and marks your door with a chalk arrow. "Night thirty," he says. "Rain or shells."'; } },
+      { label: 'Pay for seats \u2014 and one for a child.', hint: 'parts \u22128 · food \u22123', cond: function () { return childPresent() && G.res.parts >= 8 && G.res.food >= 3; },
+        run: function () { addRes('parts', -8); addRes('food', -3); G.flags.seats = true; G.flags.childSeat = true; G.arcs.train = 2; decide('Bought seats for everyone, Nika too.'); return 'The Rat looks at Nika for a long moment. "Two extra," he says, and something in his face almost becomes a person, briefly, like a shape under ice.'; } },
+      { label: 'Remember the place. Pay later.', hint: '',
+        run: function () { G.arcs.train = 2; return '"Later" is a country everyone here is emigrating to," he says, folding the map. But he leaves the chalk. He wants your money, and hope is the down payment.'; } },
+      { label: 'Chase him off.', hint: '',
+        run: function () { allMorale(-2); return 'He laughs all the way down the stairs, which is worse than if he had cursed. The chalk arrow stays on the doorframe for days, like a scar you keep touching.'; } }
+    ] },
+  { id: 'ema_trade', once: true, weight: 6, minDay: 3,
+    cond: function () { return !!G.flags.emaFriendly; },
+    title: 'Tuesday',
+    text: function () { return 'Ema climbs all three floors with a jar of rabbit stew and her dead husband\u2019s cane, which she uses mostly for pointing. "For whoever still says thank you," she says.'; },
+    choices: [
+      { label: 'Eat together. All of you.', hint: 'food +2',
+        run: function () { addRes('food', 2); allMorale(7); humanity(2); return 'For one hour the house sounds like a house. Ema tells the story of the rabbit as if the rabbit had been a personal friend. Somebody laughs, suddenly, surprising everyone including herself.'; } },
+      { label: 'Send half back with her.', hint: '',
+        run: function () { addRes('food', 1); humanity(3); allMorale(3); return 'She argues, loses, cries a little, swears she will come back Tuesday. In this city nobody has kept a Tuesday in a year. You find yourself hoping anyway.'; } }
+    ] },
+  { id: 'quiet', weight: 3,
+    title: 'A quiet night',
+    text: function () { return 'The shells fall on someone else\u2019s tomorrow tonight. The house creaks, settling its bones. Downstairs a candle burns through its last hour, and everyone pretends to sleep, and listens to everyone else pretending.'; },
+    choices: [
+      { label: 'Let the night be quiet.', hint: '',
+        run: function () { allMorale(3); return 'Sometimes surviving is just this: a room, a candle, breathing people. Nobody says it out loud. Saying it might count as inviting fate.'; } },
+      { label: 'Talk about before. The before-times.', hint: '',
+        run: function () { allMorale(5); humanity(1); return 'Vera describes the sea. Marko starts to describe his daughter\u2019s laugh, stops, starts again, finishes. Anya falls asleep mid-sentence, smiling, which is its own kind of ceasefire.'; } },
+      { label: 'Keep watch in the dark.', hint: '',
+        run: function () { allMorale(-2); return 'You sit by the window with the crowbar and watch the city burn its slow fires. Nothing comes. The watching was the point.'; } }
+    ] }
+];
+const EV = { quiet: EVENTS.find(function (e) { return e.id === 'quiet'; }) };
+
+/* ================================================================
+   CONTENT — forced events: the lost child, the last train, ceasefire
+   ================================================================ */
+EVENTS.push(
+  { id: 'cry', weight: 0,
+    title: 'The sound under the rubble',
+    text: function () { return 'The shelling has stopped, and into the silence comes a sound none of you can unhear: a child crying, two houses down, behind a collapsed doorway. It goes on. And on. It is very close to suppertime.'; },
+    choices: [
+      { label: 'Someone goes. Now.', hint: 'the city gets a witness',
+        run: function () { G.child = { hunger: 70, hp: 60, sick: false, sickDays: 0, starve: 0 }; G.flags.childDay = G.day; G.flags.childFate = 'with-us'; allMorale(8); humanity(5); decide('Took Nika in from the ruins.'); return 'Whoever goes comes back with a girl of nine, hollow-eyed, gripping a stub of blue crayon. Her name is Nika. She does not cry anymore. That silence is heavier than the crying was.'; } },
+      { label: 'The shelling will start again. It is suicide.', hint: '',
+        run: function () { humanity(-6); allMorale(-12); decide('Ignored the child crying two houses down.'); return 'The crying stops on the third night. Nobody asks what stopped it. Vera stops humming while she works. Some silences are louder than shells.'; } },
+      { label: 'Wait until morning.', hint: 'a coin toss with a life on it',
+        run: function () { humanity(-3); allMorale(-6); if (chance(0.5)) { decide('Waited too long.'); allMorale(-8); return 'In the morning the doorway is quiet. A table has walked itself two meters and then given up. Nobody who went to bed hungry last night finishes breakfast.'; } G.child = { hunger: 78, hp: 55, sick: false, sickDays: 0, starve: 0 }; G.flags.childDay = G.day; G.flags.childFate = 'with-us'; decide('Found Nika at dawn, alive.'); return 'At first light you find her \u2014 she had crawled under a table and slept there, gripping its leg like a hand. She takes the offered water with both hands. Her name is Nika.'; } }
+    ] },
+  { id: 'train', weight: 0,
+    title: 'Night thirty',
+    text: function () { return 'The Rat\u2019s chalk arrow has not washed off the door. Tonight is night thirty. The northbound sits on the thirty-first platform for exactly one hour, and then the war keeps what is left of everyone who misses it.'; },
+    choices: [
+      { label: 'Board the train. All of us.', hint: 'the way out', cond: function () { return G.flags.seats || (G.res.parts >= 6 && G.res.food >= 3) || (G.arcs.sava === 3 && G.res.parts >= 4 && G.res.food >= 2); },
+        run: function () {
+          let note = '';
+          if (!G.flags.seats) { if (G.arcs.sava === 3 && G.res.parts >= 4 && G.res.food >= 2) { addRes('parts', -4); addRes('food', -2); } else { addRes('parts', -6); addRes('food', -3); } }
+          if (childPresent() && !G.flags.childSeat) {
+            if (G.humanity >= 65) { note = ' The Rat looks at the girl, then at you, and says nothing, which means yes. Nika boards, holding the stub of her blue crayon like a ticket.'; G.flags.childFate = 'safe-north'; G.child = null; }
+            else if (G.res.parts >= 2) { addRes('parts', -2); note = ' The Rat takes two more parts and lifts Nika onto the step himself, gentler than his prices.'; G.flags.childFate = 'safe-north'; G.child = null; }
+            else { note = ' Nika cannot ride. She stands on the platform getting smaller.'; G.flags.childLeftBehind = true; G.child = null; allMorale(-10); decide('Left Nika on the platform.'); }
+          } else if (childPresent()) { note = ' Nika boards between you, clutching the blue crayon, solemn as a pilot.'; G.flags.childFate = 'safe-north'; G.child = null; }
+          G.flags.escaped = true; G.flags.trainDone = true; decide('Boarded the last train out of the city.');
+          return 'The platform is a museum of the chosen: quiet people with quiet bags. The train breathes like a sleeping animal. As it pulls out, the city slides past the windows \u2014 burning, patient, forgiving nothing \u2014 and the fields begin.' + note;
+        } },
+      { label: 'Send the child. We stay.', hint: 'a life out, whatever it costs', cond: function () { return childPresent() && (G.flags.childSeat || G.res.parts >= 2); },
+        run: function () { if (!G.flags.childSeat) addRes('parts', -2); G.flags.childGone = true; G.flags.childFate = 'safe-north'; G.child = null; G.flags.trainDone = true; allMorale(-4); humanity(6); decide('Put Nika on the train without us.'); return 'She does not cry until the doors close, and then none of you do either. Through the glass, one small hand pressed flat, then smaller, then gone. The house is quieter than any house should be. But somewhere north, a girl is drawing your faces from memory.'; } },
+      { label: 'Stay. The city is our grave or our luck.', hint: '',
+        run: function () { G.flags.trainDone = true; G.flags.trainRefused = true; allMorale(-3); decide('Refused the last train.'); return 'The Rat\u2019s train screams north at midnight, and the sound hangs over the city like a question none of you answered. Marko relocks the door. "We\u2019ve lived on maybe for thirty days," he says. "We\u2019ll live on it a while longer."'; } }
+    ] },
+  { id: 'ceasefire', weight: 0,
+    title: 'The silence has a texture',
+    text: function () { return 'You notice it the way you notice a missing tooth. The radios say it first \u2014 ceasefire, signed, effective. Nobody cheers. In a broken city, silence is just another kind of weather. But this one does not end.'; },
+    choices: [
+      { label: 'Open the doors. Walk out.', hint: '',
+        run: function () { allMorale(10); G.flags.ceasefireDone = true; return 'The survivors of this house stand in the street without a sky full of knives for the first time in years. Somewhere a bird makes an idiot of itself. Vera starts walking toward the hospital. Marko starts walking toward the river. Nobody says the word "tomorrow" out loud.'; } },
+      { label: 'Stay inside one more night. Just in case.', hint: '',
+        run: function () { allMorale(5); G.flags.ceasefireDone = true; return 'Old habits sit down at the table with you like relatives. In the morning it is still quiet, and the door opens, and this time you all walk through it.'; } }
+    ] }
+);
+const EV_BY_ID = {};
+EVENTS.forEach(function (e) { EV_BY_ID[e.id] = e; });
+
+/* ================================================================
+   CONTENT — night locations
+   ================================================================ */
+const LOCS = {
+  abandoned: {
+    name: 'Abandoned house', risk: 'risk: low · materials', base: 0.16,
+    intro: 'The Kolar house, three streets down. They left in the first week, taking nothing heavy. Dust lies on everything like grey snow, and in the corner a child\u2019s bicycle stands upside down, still dressed for riding.',
+    choices: function () {
+      return [
+        { label: 'Work slowly. Room by room.', hint: 'safe · modest loot', noise: 0.02,
+          run: function () { const p = randi(1, 2); const f = chance(0.5) ? 1 : 0; addRes('parts', p); addRes('food', f); return 'You go through the house the way you would go through a sleeping relative\u2019s things \u2014 fast, ashamed, thorough. A jar of pickled peppers, a fistful of bolts, a book of matches worn soft.'; } },
+        { label: 'Smash the wardrobe. Take it all.', hint: 'rich loot · loud', noise: 0.14,
+          run: function () { addRes('parts', randi(2, 3)); addRes('food', 1); if (chance(0.3)) addRes('meds', 1); return 'The crash sounds enormous in the empty street. You freeze, count ten breaths, and keep working with both arms.'; } },
+        { label: 'The closet with the child\u2019s coat.', hint: 'a moral knot', noise: 0,
+          run: function () { return { stage: 'wallet' }; } }
+      ];
+    },
+    stages: {
+      wallet: {
+        text: 'Inside the closet: winter coats still on their hangers, and on the shelf, a wallet. Someone\u2019s whole life in depreciation \u2014 papers, currency from a country that is being erased, and a photograph: a boy at the sea, gap-toothed, squinting.',
+        choices: function () {
+          return [
+            { label: 'Take the money. Leave the photograph.', hint: 'parts +2',
+              run: function () { addRes('parts', 2); humanity(1); decide('Took a dead country\u2019s money but left the boy his sea.'); return 'The currency will buy bread from people who no longer believe in anything. The photograph stays face-down on the shelf, sun-bleached, keeping the sea.'; } },
+            { label: 'Take everything.', hint: 'parts +3 · a stain',
+              run: function () { const s = scavenger(); addRes('parts', 3); humanity(-3); if (s) morale(s, -4); decide('Took even the photograph.'); return 'Outside you throw the photograph away, then go back for it, then throw it away again. This is called loot. It weighs more than the cans.'; } },
+            { label: 'Leave it all.', hint: '',
+              run: function () { const s = scavenger(); humanity(3); if (s) morale(s, 3); return 'You close the closet the way you would close a door on the sleeping. The street outside feels colder, and somehow cleaner.'; } }
+          ];
+        }
+      }
+    }
+  },
+  hospital: {
+    name: 'The hospital, Ward C', risk: 'risk: medium · medicine', base: 0.28,
+    intro: 'The city hospital, the wing the shells opened like a tin can. The corridors are moonlit and white with dust. Somewhere water drips in a rhythm too patient to be natural.',
+    choices: function () {
+      const list = [
+        { label: 'Ward C: the abandoned supplies.', hint: 'meds +2', noise: 0.05,
+          run: function () { addRes('meds', 2); if (chance(0.5)) addRes('parts', 1); const s = scavenger(); const v = getChar('vera'); if (v && !v.dead && G.arcs.mira >= 1 && G.flags.miraState === 'unknown') { G.flags.miraState = 'checkpoint'; G.flags.miraDeadline = G.day + 6; return 'Shelves picked over months ago, but the looters wanted drugs, not saline and gauze. In the nurses\u2019 station a pencil note, still legible: "M. Petrov \u2014 stable \u2014 moved to the checkpoint holding." Vera\u2019s sister is alive, behind the wire.'; } return 'Shelves picked over months ago, but the looters wanted what numbs, not what heals. You take gauze, saline, a jar of something that claims to be vitamins.' + (s ? ' Vera would know what half of this is for.' : ''); } }
+      ];
+      if (G.arcs.sava === 0) {
+        list.push({ label: 'The tapping behind the basement door.', hint: 'three knocks, a pause, two', noise: 0,
+          run: function () { G.arcs.sava = 2; addRes('meds', 1); humanity(2); decide('Found Dr. Sava\u2019s hidden hospital.'); return 'Three knocks, a pause, two knocks. The door opens on darkness and a smell of carbolic. Dr. Sava, seventy if he is a day, holds a scalpel the way other men hold cigarettes. "Living patients are the only currency that spends down here," he says. "The soldiers took my clinic\u2019s crate to their checkpoint \u2014 marked with a red cross. Bring it to me, and this house will always have a doctor." He presses one ampoule into your hands \u2014 a down payment, or a test. The door closes without a sound.'; } });
+      } else if (G.arcs.sava === 2) {
+        list.push({ label: 'Listen at the basement door. Not yet.', hint: 'Sava waits', noise: 0,
+          run: function () { return 'Three knocks, a pause, two knocks. You knock nothing tonight. Somewhere behind the door, water drips, patient as a metronome. The doctor\u2019s crate is still sitting in the soldiers\u2019 depot, marked with a red cross.'; } });
+      }
+      list.push({ label: 'The morgue ledger.', hint: 'parts +2 · it costs something to look', noise: 0.08,
+        run: function () { const s = scavenger(); addRes('parts', 2); addRes('food', 1); humanity(-3); if (s) morale(s, -6); if (G.arcs.mira >= 1 && G.flags.miraState === 'unknown') { G.flags.miraState = 'checkpoint'; G.flags.miraDeadline = G.day + 6; return 'The ledger records the arithmetic of shells: names, ages, causes. You take the brass fittings from a rack and hate yourself efficiently, without stopping the work. Near the end, in a nurse\u2019s tired pencil: "M. Petrov \u2014 moved to the checkpoint holding." She was alive in the fall.'; } return 'The ledger records the arithmetic of shells: names, ages, causes, in a nurse\u2019s tired pencil. You take the brass fittings from a rack and hate yourself efficiently, without stopping the work.'; } });
+      return list;
+    }
+  },
+  checkpoint: {
+    name: 'The checkpoint', risk: 'risk: high · everything · soldiers', base: 0.36,
+    intro: 'The old bus terminal, strung with wire and lamplight. White armbands check papers at the gap in the concrete. In the floodlights everything casts two shadows, and both of them are watched.',
+    choices: function () {
+      const list = [
+        { label: 'The supply crates behind the guard post.', hint: 'parts, food · blind seam between floodlights', noise: 0.15,
+          run: function () { addRes('parts', randi(2, 3)); addRes('food', randi(0, 2)); return 'You move in the blind seam between two floodlights, on the count of your own pulse. The crates hold tins, bootlaces, someone\u2019s confiscated camera. You take what feeds and what trades.'; } }
+      ];
+      if (G.arcs.sava === 2 && !G.flags.crateStolen) {
+        list.push({ label: 'The marked crate with the red cross.', hint: 'Sava\u2019s price · meds +2 · the guards will notice', noise: 0.2,
+          run: function () { addRes('meds', 2); G.flags.crateStolen = true; G.arcs.sava = 3; G.flags.savaCrate = true; humanity(-2); decide('Stole the soldiers\u2019 medical crate for Dr. Sava.'); return 'The red cross comes off in your hands, paint and all. Somewhere a wounded man will do without \u2014 that is the shape of the deal, and you sign it by lifting the crate. By morning it will be in the basement of Ward C, and the doctor\u2019s door will open to your knock forever.'; } });
+      }
+      if (G.arcs.mira >= 1 && G.flags.miraState === 'checkpoint') {
+        list.push({ label: 'The woman washing shirts behind the wire.', hint: 'Vera\u2019s sister', noise: 0.1,
+          run: function () { return { stage: 'wire' }; } });
+      } else {
+        list.push({ label: 'The man behind the wire.', hint: 'a prisoner\u2019s message', noise: 0.1,
+          run: function () { const s = scavenger(); humanity(2); if (s) morale(s, -3); return 'A prisoner in the holding pen presses to the wire. "North at dawn," he says. "All of us. Tell someone \u2014 anyone \u2014 we went north." His hands around the wire look like something that used to play piano.'; } });
+      }
+      list.push({ label: 'The crooked guard, Vasyl.', hint: 'parts \u22122 · tins, and gossip', noise: 0, cond: function () { return G.res.parts >= 2; },
+        run: function () { addRes('parts', -2); addRes('meds', 1); addRes('food', 1); let extra = ''; if (G.arcs.traitor >= 1 && G.arcs.traitor < 2) { G.arcs.traitor = 2; extra += ' And a fat neighbor with a red scarf who drinks with the armbands at dusk \u2014 Branko, the salt man. Vasyl laughs. It is not a kind laugh.'; } if (G.arcs.mira >= 1 && G.flags.miraState === 'unknown') { G.flags.miraState = 'checkpoint'; G.flags.miraDeadline = G.day + 6; extra += ' And a woman named Petrov, washing soldiers\u2019 shirts in the holding pen. Petrov, like Vera\u2019s sister.'; } return 'Vasyl takes the parts with one hand and shakes with the other, as if the handshake were the purchase. "Coffee," he says, handing over tins that are almost coffee. He talks, because loneliness.' + extra; } });
+      return list;
+    },
+    stages: {
+      wire: {
+        text: 'Between the second and third post, behind the wire, a woman sits on her heels washing a shirt in a puddle of meltwater. She pushes the hair behind her ear with the back of her wrist \u2014 exactly the way Vera does. "Mira," you breathe, and the word barely survives the wire.',
+        choices: function () {
+          return [
+            { label: 'Come with me. Now.', hint: 'fences, floodlights, open ground',
+              run: function () {
+                const s = scavenger(); const p = G.flags.wireKnown ? 0.1 : 0.25;
+                if (!chance(p)) { G.flags.miraState = 'rescued'; decide('Pulled Mira out of the checkpoint holding pen.'); const v = getChar('vera'); if (v && !v.dead) morale(v, 25); humanity(4); return 'The shirt is left in the puddle, spreading red mud like a bloom. Two fences, one gap, one eternity of open ground. She laughs once \u2014 actually laughs \u2014 when you both collapse behind the ruined kiosk, alive, in the dark, free.'; }
+                if (chance(0.08)) { return 'A shout. A lamp swings. You go over the fence alone, on hands that will carry the scar, and the last thing you hear is her voice, steady, telling you to GO. They march the holding pen north at dawn. The shirt stays in the puddle, washing itself in the meltwater.'; }
+                wound(s, 15, 25, 'the checkpoint wire'); G.flags.miraState = 'lost'; decide('Tried and failed to reach Mira at the checkpoint.'); const v2 = getChar('vera'); if (v2 && !v2.dead) morale(v2, -20); return 'A shout. A lamp swings. You go over the fence alone, bleeding, and the last thing you hear is her voice, steady, telling you to GO. They march the holding pen north at dawn. Some failures you will carry in the body. This one you will carry somewhere else.';
+              } },
+            { label: 'Memorize the rotations. Come back ready.', hint: 'the next attempt will go smoother',
+              run: function () { G.flags.wireKnown = true; const s = scavenger(); if (s) morale(s, -2); return 'You count lamps, boots, the lazy arc of the searchlight. Mira does not look at you when you go \u2014 she looks at the wire, learning it too, the same way.'; } },
+            { label: 'There is nothing to be done tonight.', hint: '',
+              run: function () { const s = scavenger(); if (s) morale(s, -8); decide('Left Mira behind the wire.'); return 'You walk away from your own blood in ten steps, which is how far the darkness starts. The shirt-washing continues behind you, steady as a clock. Some things, once seen, are carried forever.'; } }
+          ];
+        }
+      }
+    }
+  },
+  family: {
+    name: 'The family home', risk: 'risk: medium · food · someone lives here', base: 0.24,
+    intro: 'A family home the war missed: glazed windows half intact, smoke from the chimney, a winter garden under snow. Someone still lives here. That is the whole problem, and the whole temptation.',
+    choices: function () {
+      const list = [
+        { label: 'The old woman\u2019s medicine cabinet.', hint: 'meds · she is asleep', noise: 0.08,
+          run: function () { return { stage: 'ema' }; } },
+        { label: 'The winter jars in the cellar.', hint: 'food +2', noise: 0.03,
+          run: function () { addRes('food', 2); humanity(-1); return 'Raspberry, pear, something dark and meaty, each lid labeled FOR WINTER in a firm hand. It is winter now. The labels did not say whose.'; } }
+      ];
+      if (!G.flags.emaRobbed) {
+        list.push({ label: 'Knock. Trade honestly.', hint: 'parts \u22121 · food, maybe pills', noise: 0, cond: function () { return G.res.parts >= 1; },
+          run: function () { addRes('parts', -1); addRes('food', 2); if (chance(0.5)) addRes('meds', 1); G.flags.emaFriendly = true; humanity(3); const s = scavenger(); if (s) morale(s, 3); let extra = ''; if (G.arcs.mira >= 1 && G.flags.miraState === 'unknown') { G.flags.miraState = 'checkpoint'; G.flags.miraDeadline = G.day + 6; extra = ' And then, unprompted, pouring real tea: "A girl with a red ribbon, asking after Ward C, back in the fall. They moved her to the terminal checkpoint. God keep her."'; } return 'Ema makes real tea, with leaves you can see. She talks about her son at the front and her husband under the linden in the yard. Come back anytime, she says at the gate. Daylight, next time.' + extra; } });
+      }
+      return list;
+    },
+    stages: {
+      ema: {
+        text: 'The bedroom smells of camphor and peppermint. Under the bed, a cabinet: pills in ordered ranks, labeled in a steady old hand. On the pillow, an open mouth, breath like a slow bell. Ema is asleep. The cabinet would hold this house through the winter.',
+        choices: function () {
+          return [
+            { label: 'Take the pills. She will not wake.', hint: 'a coin toss with a witness',
+              run: function () { const s = scavenger(); const wakeP = (s && s.trait === 'thief') ? 0.15 : 0.3; if (chance(wakeP)) return { stage: 'ema-wake' }; addRes('meds', 2); G.flags.emaRobbed = true; humanity(-4); decide('Stole pills from a sleeping old woman.'); return 'The ranks of labeled bottles thin by a third. The slow breath never changes rhythm. You leave exactly as you came, and the house lets you, and something about that feels like being haunted in advance.'; } },
+            { label: 'Shut the cabinet. Leave the room.', hint: '',
+              run: function () { const s = scavenger(); humanity(3); if (s) morale(s, 2); return 'The cabinet clicks shut as softly as a prayer finishing. Some things are kept outside the reach of hunger \u2014 or the attempt is made, which might be the same thing.'; } }
+          ];
+        }
+      },
+      'ema-wake': {
+        text: 'The breath stops. The eyes open, old and unhurried, taking their time about fear. "Well," Ema says. "At least you did not pretend to be the boogeyman."',
+        choices: function () {
+          return [
+            { label: 'Kneel. Ask her forgiveness.', hint: 'meds +1, freely given',
+              run: function () { addRes('meds', 1); G.flags.emaFriendly = true; G.flags.emaReturned = true; humanity(3); const s = scavenger(); if (s) morale(s, 3); decide('Was caught stealing and forgiven by Ema.'); return 'She gives you the pills herself, both hands, like communion. "War makes thieves," she says. "Being let off \u2014 that is what makes people back into neighbors." At the door she adds: "Come by daylight next time. Knock."'; } },
+            { label: 'Run.', hint: 'fast · she will remember', noise: 0.2, force: true,
+              run: function () { G.flags.emaRobbed = true; humanity(-2); return 'Down the drainpipe, through the winter garden, heart like a fist on a door. You never see her face in full. That is worse, some part of you understands. Somehow worse.'; } },
+            { label: 'Push past her.', hint: 'meds +2 · a stain',
+              run: function () { addRes('meds', 2); G.flags.emaRobbed = true; humanity(-6); const s = scavenger(); if (s) morale(s, -8); decide('Shoved an old woman aside for her pills.'); return 'She sits down on the floor, slowly, like a folding chair. The pills rattle in your pocket all the way home, all night, all week. They work exactly as intended on everyone.'; } }
+          ];
+        }
+      }
+    }
+  }
+};
+
+/* ---- checkpoint encounter: caught in the light ---- */
+const CK_ENC = {
+  text: 'A flashlight beam pins you against the customs house. "Stop! Hands!" The voice is young and very scared, which is the most dangerous kind. Twenty meters of open ground between you and the dark.',
+  choices: function (s) {
+    return [
+      { label: 'Run for the dark.', hint: 'shots in the back', cond: function () { return true; },
+        run: function () {
+          const r = Math.random();
+          if (r < 0.42) return ['You run the way sound leaves a struck glass. Shots \u2014 indignant, then behind, then nothing. The bag lives. So do you, shaking, all the way home.'];
+          if (r < 0.84) { wound(s, 15, 28, 'shot fleeing the checkpoint'); return ['Two steps from the dark something hot tears the night beside your ear and your side agrees to carry the pain instead of you. You leave blood on the rubble \u2014 yours \u2014 but you leave.']; }
+          die(s, 'shot down at the checkpoint');
+          return ['The shots come easy, the way they do at running silhouettes. The bag spills across the frost. The boy soldier stands over you, shouting for a medic, who will come at his own pace \u2014 which is the pace of arithmetic.'];
+        } },
+      { label: 'Fight. You have a crowbar.', hint: 'brutal · even odds', cond: function () { return true; },
+        run: function () {
+          humanity(-2); const s2 = scavenger(); if (s2) morale(s2, -5);
+          const r = Math.random();
+          if (r < 0.5) return ['It is short, ugly, and ends with the boy sitting in the snow, breathing, disarmed, sixteen years old. You take nothing of his. You leave him his life, and you do not feel good about how heavy that makes the walk home.'];
+          if (r < 0.75) { wound(s2, 12, 22, 'the checkpoint'); return ['You get the worst of it by one blow. The crowbar keeps him back long enough to matter, and you both decide, wordlessly, that this is over.']; }
+          die(s2, 'beaten to death at the checkpoint');
+          return ['He is faster. The rifle butt teaches its short lesson, and the darkness takes you both home in different directions.'];
+        } },
+      { label: 'Offer a bribe.', hint: '1 part or can · a coward\u2019s mercy', cond: function () { return G.res.parts >= 1 || G.res.food >= 1; },
+        run: function () {
+          if (G.res.parts >= 1) addRes('parts', -1); else addRes('food', -1);
+          const s3 = scavenger();
+          if (chance(0.85)) return ['The can changes hands and the night changes rules. The boy looks left, looks right, and becomes a man of commerce. "Fast," he says. "Fast, uncle." You are fast.'];
+          wound(s3, 8, 16, 'the checkpoint');
+          return ['He takes the bribe, then the bag, then swings the flashlight like a man closing an account. You keep the skin you ran out with, and little else.'];
+        } }
+    ];
+  }
+};
+
+/* ================================================================
+   FLOW — day / dusk / night cycle
+   ================================================================ */
+const Flow = { btn: null };
+
+function pickDuskEvent() {
+  if (G.day === 30 && !G.flags.trainDone) return EV_BY_ID.train;
+  if (G.day >= 40 && !G.flags.ceasefireDone) return EV_BY_ID.ceasefire;
+  if (G.day >= 3 && !G.usedDusk.cry) return EV_BY_ID.cry;
+  const prio = EVENTS.filter(function (e) { return e.prio && !G.usedDusk[e.id] && (!e.cond || e.cond()); });
+  if (prio.length) return prio[0];
+  const pool = EVENTS.filter(function (e) {
+    return !e.prio && e.weight > 0 && (!e.once || !G.usedDusk[e.id]) && (!e.minDay || G.day >= e.minDay) && (!e.cond || e.cond());
+  });
+  if (!pool.length) return EV_BY_ID.quiet;
+  let tot = 0; pool.forEach(function (e) { tot += e.weight; });
+  let r = Math.random() * tot;
+  for (let i = 0; i < pool.length; i++) { r -= pool[i].weight; if (r <= 0) return pool[i]; }
+  return pool[0];
+}
+
+function enterDay() {
+  G.phase = 'day';
+  FX.mode = 'day'; Snd.setScene('day');
+  fadeTo('DAY ' + G.day, function () { showGameUI(true); renderPanel(); });
+  saveGame();
+}
+
+function newDay(n) {
+  G.day = n;
+  G.assign = {}; G.lastLines = []; G.supperLines = [];
+  /* arc upkeep */
+  if (G.arcs.mira >= 1 && G.flags.miraState === 'checkpoint' && G.flags.miraDeadline && n > G.flags.miraDeadline) {
+    G.flags.miraState = 'lost';
+    logLine('The checkpoint holding pen stands empty. They marched the prisoners north before dawn.');
+    const v = getChar('vera'); if (v && !v.dead) morale(v, -25);
+    decide('They marched Mira north. We were too late.');
+  }
+  if (G.flags.brankoLeaves && n >= G.flags.brankoLeaves && G.arcs.traitor === 4 && !G.flags.brankoGone) {
+    G.flags.brankoGone = true;
+    logLine('Branko\u2019s window is dark. The floor below him is empty. He is gone \u2014 voluntarily, in the night.');
+  }
+  if (G.arcs.traitor === 5 && !G.flags.brankoGone && n % 4 === 0) { addRes('parts', 1); logLine('A knock, a package. The blackmail keeps the stove fed.'); }
+  if (G.flags.goranHidden && n > G.flags.goranDays) { G.flags.goranHidden = false; logLine('Goran is gone from the cellar, leaving a folded blanket and an apology in the frost.'); }
+  /* survivors upkeep */
+  alive().forEach(function (c) {
+    hungerUp(c, 10);
+    if (c.hunger > 80 && !c.sick) { c.sick = true; logLine('Hunger has made ' + c.name + ' ill.'); }
+    if (c.sick) { hp(c, -8, 'fever and hunger'); if (c.hunger < 60) { c.sick = false; logLine(c.name + '\u2019s fever broke.'); } }
+    if (c.injured) { hp(c, -5, 'wounds that would not close'); c.injuryDays--; if (c.injuryDays <= 0) { c.injured = false; logLine(c.name + '\u2019s wounds have closed.'); } }
+    if (!c.depressed && c.morale < 20) { c.depressed = true; logLine(c.name + ' has stopped talking. The eyes are the worst part.'); }
+    if (c.depressed && c.morale >= 25) { c.depressed = false; logLine(c.name + ' is back among the living, mostly.'); }
+  });
+  /* Dr. Sava's daily care */
+  if (G.arcs.sava === 3) {
+    addRes('meds', 1);
+    const t = lowestHpChar();
+    if (t && (t.hp < 70 || t.sick)) { hp(t, 8); if (t.sick && chance(0.6)) t.sick = false; logLine('Dr. Sava\u2019s boy delivers dressings and a jar of something godly. ' + t.name + ' mends a little.'); }
+  }
+  /* the child */
+  if (G.child) {
+    const ch = G.child;
+    ch.hunger = clamp(ch.hunger + 12, 0, 100);
+    if (ch.sick) {
+      ch.sickDays = (ch.sickDays || 0) + 1;
+      if (G.arcs.sava === 3) { ch.sick = false; ch.sickDays = 0; logLine('Dr. Sava sits with Nika through the night. The fever lets go of her by morning.'); }
+      else if (ch.sickDays >= 4) childDie('The fever took her in the night, small and fast, like winter.');
+    }
+    if (G.child && ch.hunger >= 95) { ch.starve = (ch.starve || 0) + 1; if (ch.starve >= 3) childDie('Hunger. Of all the ways the city found.'); }
+    else if (G.child) ch.starve = 0;
+    if (G.child && ch.hp <= 0) childDie('Her body simply stopped, quietly, between one day and the next.');
+    if (G.child && G.flags.emaFriendly && n % 3 === 0) { ch.hunger = clamp(ch.hunger - 25, 0, 100); logLine('Ema sends up soup for the girl, thick enough to stand a spoon in.'); }
+  }
+  if (G.flags.milanSavedGuard > 0) G.flags.milanSavedGuard--;
+  saveGame();
+  if (Death.queue.length) { setNext(function () { enterDay(); }); Death.check(); return; }
+  enterDay();
+}
+
+function applyDayActions() {
+  const out = [];
+  alive().forEach(function (c) {
+    const id = G.assign[c.id] || 'rest';
+    ACTION_BY_ID[id].run(c, out);
+  });
+  alive().forEach(function (c) { hungerUp(c, 3); });
+  G.lastLines = out;
+  G.phase = 'dayResult';
+  saveGame();
+  if (Death.queue.length) { setNext(function () { renderPanel(); }); Death.check(); return; }
+  renderPanel();
+}
+
+function startDusk() {
+  G.phase = 'dusk';
+  FX.mode = 'dusk'; Snd.setScene('dusk');
+  const lines = [];
+  alive().forEach(function (c) {
+    if (G.res.food > 0) { addRes('food', -1); hungerUp(c, -45); lines.push(c.name + ' ate.'); }
+    else { morale(c, -4); lines.push(c.name + ' went to bed hungry.'); }
+  });
+  if (G.child) {
+    if (G.res.food > 0 && chance(0.6)) { addRes('food', -1); G.child.hunger = clamp(G.child.hunger - 40, 0, 100); lines.push('Nika ate a little, carefully, watching everyone\u2019s eyes.'); }
+    else { G.child.hunger = clamp(G.child.hunger + 12, 0, 100); lines.push('Nika gave up her share with a shrug too old for her.'); }
+  }
+  alive().forEach(function (c) { if (c.hunger > 80 && !c.sick) { c.sick = true; lines.push('Hunger is settling into ' + c.name + ' like a fever.'); } });
+  G.supperLines = lines;
+  const ev = pickDuskEvent();
+  G.duskEventId = ev.id;
+  saveGame();
+  fadeTo('DUSK', function () { renderPanel(); });
+}
+
+function resolveDusk(i) {
+  const ev = EV_BY_ID[G.duskEventId];
+  if (!ev) return;
+  const ch = ev.choices[i];
+  if (!ch || (ch.cond && !ch.cond())) return;
+  const txt = ch.run();
+  G.usedDusk[ev.id] = true;
+  G.lastLines = [txt];
+  G.phase = 'duskResult';
+  saveGame();
+  if (Death.queue.length) { setNext(function () { renderPanel(); }); Death.check(); return; }
+  renderPanel();
+}
+
+function afterDuskContinue() {
+  if (G.flags.escaped || G.flags.ceasefireDone) { showEnding(); return; }
+  startNight();
+}
+
+function startNight() {
+  G.phase = 'night';
+  G.night = { stage: 'who', who: null, loc: null, stageText: '', lines: [], enc: false };
+  FX.mode = 'night'; Snd.setScene('night');
+  fadeTo('NIGHT', function () { renderPanel(); });
+}
+
+function nightChooseWho(id) { G.night.who = id; G.night.stage = 'loc'; saveGame(); renderPanel(); }
+
+function nightNoOne() {
+  const lines = ['Nobody goes into the dark tonight. The dark respects the decision, then makes its own.'];
+  G.night.who = null;
+  G.lastLines = homeNightLines(lines);
+  G.phase = 'nightResult';
+  saveGame();
+  renderPanel();
+}
+
+function nightChooseLoc(id) { G.night.loc = id; G.night.stage = 'scene'; saveGame(); renderPanel(); }
+
+function currentLoc() { return LOCS[G.night.loc]; }
+function scavenger() { return G.night && G.night.who ? getChar(G.night.who) : null; }
+
+function nightChoices() {
+  const L = currentLoc();
+  if (!L) return [];
+  if (G.night.stage === 'scene') return L.choices();
+  if (L.stages && L.stages[G.night.stage]) return L.stages[G.night.stage].choices();
+  return [];
+}
+
+function nightDoChoice(i) {
+  const c = nightChoices()[i];
+  if (!c || (c.cond && !c.cond())) return;
+  const s = scavenger();
+  const res = c.run(s);
+  if (res && res.stage) { G.night.stage = res.stage; G.night.stageText = ''; saveGame(); renderPanel(); return; }
+  const lines = [res || 'You move through the dark with a burglar\u2019s patience.'];
+  let enc;
+  if (c.force) enc = forceEncounter(G.night.loc);
+  else enc = rollEncounter(G.night.loc, s, c.noise || 0);
+  if (enc.type === 'choice') {
+    G.night.stage = 'encounter';
+    G.night.lines = lines;
+    G.night.enc = true;
+    saveGame();
+    renderPanel();
+    return;
+  }
+  applyEncounter(lines, enc, s);
+  finalizeNight(lines);
+}
+
+function applyEncounter(lines, enc, s) {
+  if (enc.type === 'wounded' && s && !s.dead) { wound(s, enc.dmgLo, enc.dmgHi, 'the night streets'); }
+  if (enc.type === 'death' && s && !s.dead) { die(s, enc.cause || 'the night streets'); }
+  if (enc.text) lines.push(enc.text);
+  return lines;
+}
+
+function rollEncounter(locId, ch, noise) {
+  const L = LOCS[locId];
+  let p = L.base + noise;
+  if (locId === 'checkpoint') { if (ch && ch.trait === 'deserter') p *= 0.55; if ((G.flags.milanSavedGuard || 0) > 0) p *= 0.5; if (G.flags.savaCrate) p *= 1.2; }
+  if (locId === 'hospital' && ch && ch.trait === 'doctor') p *= 0.6;
+  if ((locId === 'family' || locId === 'abandoned') && ch && ch.trait === 'thief') p *= 0.55;
+  if (G.res.tools > 0) p *= 0.85;
+  if (ch && ch.depressed) p *= 1.3;
+  if (p > 0.75) p = 0.75;
+  if (!chance(p)) return { type: 'none', text: pick(SAFE_NIGHTS) };
+  if (locId === 'checkpoint') return { type: 'choice' };
+  if (locId === 'hospital') {
+    if (chance(0.6)) return { type: 'none', text: 'Boots in the corridor \u2014 four pairs, unhurried. You fold into a supply cupboard and breathe with the drip of the pipes until they move on. The city\u2019s apex predators pass within arm\u2019s reach and do not look left.' };
+    return { type: 'wounded', dmgLo: 12, dmgHi: 22, text: 'They find you in the cupboard. Questions, rifle-butts, a lecture delivered at volume about looters and parasites. You keep the bag by staying conscious for all of it.' };
+  }
+  if (locId === 'abandoned') {
+    if (chance(0.5)) return { type: 'none', text: 'Another light in the next room \u2014 another scavenger, thinner than you, hungrier than you. You watch each other across the dark like two cats, and agree by silence to split the street. You take what you have and go.' };
+    return { type: 'wounded', dmgLo: 10, dmgHi: 20, text: 'The other looter is not in a splitting mood. It goes badly for both, briefly and without honor. You keep the bag. He keeps the room.' };
+  }
+  if (locId === 'family') {
+    if (G.flags.emaFriendly) {
+      if (chance(0.75)) return { type: 'none', text: 'A shape in the winter garden \u2014 the son, home on leave. He looks at you, at the lit window where his mother sleeps. "Take the pears," he says at last, not unkindly. "Leave the jars on the sill. She counts the jars." He walks you to the gap in the fence like a guest.' };
+      return { type: 'wounded', dmgLo: 8, dmgHi: 16, text: 'The son is not in a merciful mood tonight. The rifle stays slung; the butt of it does not. "Next time," he says, breathing hard, "knock." You keep the bag, mostly.' };
+    }
+    if (chance(0.45)) return { type: 'none', text: 'A shape in the winter garden. "EMA?" The son, home on leave. You are gone before the word lands, over the fence with the bag hugged to your chest, leaving only footprints in the parsnip bed.' };
+    return { type: 'wounded', dmgLo: 10, dmgHi: 20, text: 'He catches you at the fence. He does not shoot; family homes have rules, even now. What he does instead leaves marks you will explain to no one.' };
+  }
+  return { type: 'none', text: '' };
+}
+
+function forceEncounter(locId) {
+  if (locId === 'checkpoint') return { type: 'choice' };
+  return rollEncounter(locId, scavenger(), 0.4);
+}
+
+function nightEncounterChoice(i) {
+  const s = scavenger();
+  const lines = G.night.lines || [];
+  const c = CK_ENC.choices(s)[i];
+  if (!c || (c.cond && !c.cond())) return;
+  const out = c.run(s);
+  lines.push(out.join(' '));
+  finalizeNight(lines);
+}
+
+function finalizeNight(lines) {
+  const hl = homeNightLines(lines);
+  G.lastLines = hl;
+  G.phase = 'nightResult';
+  G.night = { stage: 'done', who: null, loc: null, stageText: '', lines: [], enc: false };
+  saveGame();
+  if (Death.queue.length) { setNext(function () { renderPanel(); }); Death.check(); return; }
+  renderPanel();
+}
+
+function homeNightLines(lines) {
+  let guarded = false, strongGuard = false;
+  alive().forEach(function (c) { if (G.assign[c.id] === 'guard') { guarded = true; if (c.trait === 'deserter') strongGuard = true; } });
+  if (G.night && G.night.who === null) { allMorale(-3); lines.push('The house listens to its own pulse all night. Nobody sleeps well.'); }
+  let p = 0.16 + (3 - Math.min(G.res.shelter, 5)) * 0.04;
+  if (G.night && G.night.who === null) p += 0.10;
+  if (aliveCount() === 1 && G.night && G.night.who) p += 0.15;
+  if (guarded) p = strongGuard ? 0.03 : 0.06;
+  if (G.arcs.traitor === 1) p += (G.flags.probeRisk || 0.03);
+  if (G.arcs.traitor === 2) p += 0.10;
+  if (G.arcs.traitor === 6) p += 0.08;
+  if (G.arcs.traitor === 4 && !G.flags.brankoGone) p += 0.10;
+  if (G.arcs.traitor === 5) p += 0.04;
+  if (G.child) p += 0.04;
+  if (G.flags.brankoGone || G.arcs.traitor === 3) p = Math.max(0.02, p - 0.10);
+  if (chance(p)) {
+    FX.shake = Math.max(FX.shake, 8); Snd.boom();
+    const lostFood = Math.min(G.res.food, randi(1, 2));
+    const lostParts = Math.min(G.res.parts, randi(0, 2));
+    addRes('food', -lostFood); addRes('parts', -lostParts);
+    let lostMeds = 0, lostTools = 0;
+    if (G.res.meds > 0 && chance(0.4)) { lostMeds = 1; addRes('meds', -1); }
+    if (G.res.tools > 0 && chance(0.3)) { lostTools = 1; addRes('tools', -1); }
+    let t = 'Men in rain come through the back wall while the city is not looking. They take ' + (lostFood + lostParts + lostMeds + lostTools > 0 ? 'what can be carried' : 'their time') + (lostFood ? ', ' + lostFood + ' can' + (lostFood > 1 ? 's' : '') : '') + (lostMeds ? ', the medicine' : '') + (lostTools ? ', a tool' : '') + (lostParts ? ', the salvage' : '') + '.';
+    if ((G.flags.pavaFed || 0) >= 1) { t += ' Pava\u2019s voice from the stairwell scatters them like pigeons \u2014 half of what they came for stays in the house.'; }
+    lines.push(t);
+    if (G.flags.goranHidden) { G.flags.goranHidden = false; lines.push('They find Goran in the cellar. There is a short conversation at rifle-length, and then the cellar is just a cellar.'); const m = getChar('marko'); if (m && !m.dead) morale(m, -12); }
+    if (chance(0.3) && alive().length > 0) { const victim = pick(alive()); wound(victim, 8, 18, 'the raid'); lines.push(victim.name + ' fought the dark and lost a little of themselves.'); }
+    if (G.child) lines.push('Nika sleeps through it in the cupboard, thank whatever is left to thank.');
+  } else {
+    lines.push(guarded ? 'The night passes without visitors. ' + (strongGuard ? 'Word travels: this house is watched by a man who knows how soldiers think.' : 'The bolts hold. The guard does not blink much.') : 'The night passes without visitors. The bolts hold.');
+  }
+  return lines;
+}
+
+/* ================================================================
+   ENDINGS
+   ================================================================ */
+function computeEndingId() {
+  const n = aliveCount();
+  if (n === 0) return 'silent';
+  if (G.flags.escaped) return n === 1 ? 'one_hand' : (G.humanity >= 55 ? 'northbound' : 'left_behind');
+  if (n === 1) return 'one_hand';
+  return G.humanity >= 55 ? 'grey_dawn' : 'we_lived';
+}
+
+const ENDINGS = {
+  silent: { title: 'THE SILENT HOUSE',
+    body: function () { return [
+      'The house stands longer than the people in it, the way walls do. Snow comes in through the broken window and lies down on the floors like a guest who means no harm.',
+      'The war will end someday \u2014 wars always end, that is their single courtesy. People will come with carts and clipboards and count this house among the counted. They will find names\u2019 worth of silence, a blue crayon, and a wall where someone scratched tally marks for days they did not live to spend.',
+      'No one will write down what it cost. That is what the living are for, and it will not be you.'
+    ]; },
+    closing: 'In war, no one wins.' },
+  northbound: { title: 'NORTHBOUND',
+    body: function () { const names = alive().map(function (c) { return c.name; }).join(', '); return [
+      'The train runs all night through a country the war has only bruised. Fields, frost, a station where an old man sells apples from a crate as if selling apples were still the most important thing a man could do.',
+      names + ' \u2014 quieter than the other refugees. You have seen what people are for, both halves of it: the mending and the taking. In the morning a farmer hires hands. There is work. It is almost obscene, how simple the world is when nobody is shooting at it.',
+      'You take the work. You do not explain to anyone why you cry at the smell of soup.'
+    ]; },
+    closing: 'You survived. You also kept something the war could not take.' },
+  left_behind: { title: 'THE TRAIN THAT LEFT',
+    body: function () { return [
+      'The wheels find a rhythm, and the rhythm is like a pulse, and you cannot stop checking whether it is yours. North, past the reach of shells, the city shrinks to a red smudge on the horizon, like something coughed onto a handkerchief.',
+      'You made it out with what you grabbed: some cans, some parts, yourselves. The accounting happens quietly on the bench opposite \u2014 faces that are not there, favors not returned, doors not opened.',
+      'Survival keeps. It does not nourish. You will live a long time on what you did, and the living will be the exact weight of what you did not.'
+    ]; },
+    closing: 'You survived. That was all.' },
+  grey_dawn: { title: 'GREY DAWN',
+    body: function () { return [
+      'The ceasefire holds the way an old plank bridge holds \u2014 creaking, absurd, holding. You walk out past the wire into a city of ash and curtains, and the strangest thing is the doors: open, all of them, open.',
+      'You bury who you have to bury. You share what there is to share with the street that is left \u2014 and it turns out the street is left, mostly: faces you traded bread and truths with.',
+      'Reconstruction begins with a survey, then a school. On the first day of school, a child draws a house with all its windows whole. Nobody corrects the drawing. Everyone looks at it a long time.'
+    ]; },
+    closing: 'Peace did not look like victory. It looked like an ordinary morning.' },
+  we_lived: { title: 'WE LIVED',
+    body: function () { return [
+      'The war ends and leaves you the bill. You are alive \u2014 which turns out to be a thing that can be done to a person, rather than a thing a person does.',
+      'You eat. You repair. You do not talk about the winter, the door, the can, the wire \u2014 the inventory of what you were when nobody was counting. The silence in the house is a load-bearing silence. You build around it.',
+      'Sometimes, at night, you hear a whistle from the old stairwell, and your hand goes to the bolt before your heart goes anywhere at all.'
+    ]; },
+    closing: 'We lived. Something in us did not.' },
+  one_hand: { title: 'ONE HAND LEFT TO HOLD',
+    body: function () { return [
+      'You are the last. The house is enormous now, the way empty things get enormous: floors of your own footsteps, beds going cold in sequence, a wall of tally marks with your hand the only one still adding.',
+      'The war ends. You walk out into the noiseless morning and the light takes you for a pillar or a fence post \u2014 something that has always stood here.',
+      'You will carry them: the dead, the left, the lost. You will carry them the way you carried cans down from the attic \u2014 carefully, one at a time, because the stairs are broken and there is no one left to help.'
+    ]; },
+    closing: 'Survival, at this price, is a company you keep alone.' }
+};
+
+function arcEpilogues() {
+  const eps = [];
+  const fate = G.flags.childFate;
+  if (fate === 'safe-north') eps.push('Nika reached the north. There is a school, and a wall that receives her drawings, and the drawings are all of houses with the windows whole.');
+  else if (fate === 'with-us' && G.child) eps.push('Nika is still small, still here, still asking when the shooting stops. The question is the whole schedule now.');
+  else if (fate === 'dead') eps.push('Nika lies in the frozen yard behind the house, under a board Marko planed smooth himself. The blue crayon is on the windowsill. Nobody has moved it and nobody will.');
+  else if (fate === 'dead') eps.push('');
+  const ms = G.flags.miraState;
+  if (G.arcs.mira >= 1) {
+    if (ms === 'rescued') eps.push('Vera and Mira \u2014 the surgeon and the shirt-washer \u2014 share a room now and finish each other\u2019s silences. Vera hums while she works again.');
+    else if (ms === 'lost') eps.push('Mira went north with the holding pen, into the records of the missing. Vera writes letters to every list that exists. Some get answers. None get her.');
+    else eps.push('Mira was never found. Vera keeps the red ribbon in her pocket, and her hands are steady, which is how you know.');
+  }
+  if (G.arcs.sava === 3) eps.push('Dr. Sava still works by candlelight in the basement of Ward C. His ledger of debts has exactly one column, and it says: bring more people.');
+  else if (G.arcs.sava === 2) eps.push('The crate with the red cross still sits in the soldiers\u2019 depot. The doctor\u2019s door stayed shut, and the basement stayed dark.');
+  if (G.arcs.traitor === 3) eps.push('Branko\u2019s name is not spoken on the street. The window of his flat is dark, and the salt he gave sits untouched in a cupboard, like evidence.');
+  else if (G.arcs.traitor === 4 && G.flags.brankoGone) eps.push('Branko left in the night, voluntarily. Some nights the house still listens for the whistling, and some nights \u2014 worse \u2014 misses it.');
+  else if (G.arcs.traitor === 5) eps.push('The packages from Branko kept coming every fourth day until the ceasefire. Nobody ever says the word blackmail. The word eats alone in the kitchen.');
+  if (G.flags.milanDay) eps.push('Milan walked north months later on his own legs, which were almost lost and entirely his own. He sends letters no one can answer and everyone reads.');
+  return eps.filter(function (s) { return s.length > 0; });
+}
+
+/* ================================================================
+   UI — screens, HUD, panels
+   ================================================================ */
+const ICONS = {
+  health: '<svg viewBox="0 0 16 16"><path d="M6 1h4v5h5v4h-5v5H6v-5H1V6h5z"/></svg>',
+  hunger: '<svg viewBox="0 0 16 16"><path d="M1 9h14a7 7 0 0 1-14 0z"/><path d="M5 6V3M8 6V2M11 6V3" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>',
+  morale: '<svg viewBox="0 0 16 16"><path d="M8 14 2.6 8.6a3.5 3.5 0 0 1 4.9-5L8 4.2l.5-.6a3.5 3.5 0 0 1 4.9 5z"/></svg>',
+  food: '<svg viewBox="0 0 16 16"><path d="M2 9h12a6 6 0 0 1-12 0z"/><path d="M6 6V4M10 6V4" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>',
+  meds: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M7 4h2v3h3v2H9v3H7V9H4V7h3z"/></svg>',
+  parts: '<svg viewBox="0 0 16 16"><path d="M8 1l6 3.5v7L8 15l-6-3.5v-7z" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="8" r="2.1"/></svg>',
+  tools: '<svg viewBox="0 0 16 16"><path d="M2 14l4.5-4.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M7 3l2-2 5 5-2 2z"/><path d="M9 5L6.5 7.5" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>',
+  shelter: '<svg viewBox="0 0 16 16"><path d="M2 8 8 2l6 6h-2v6H4V8z"/></svg>'
+};
+
+function phaseName() {
+  return { day: 'MORNING', dayResult: 'AFTERNOON', dusk: 'DUSK', duskResult: 'DUSK', night: 'NIGHT', nightResult: 'NIGHT' }[G.phase] || '';
+}
+
+function showScreen(name) {
+  ['menu', 'about', 'death', 'ending'].forEach(function (s) {
+    byId('screen-' + s).classList.toggle('hidden', s !== name);
+  });
+}
+function hideScreens() { showScreen('__none__'); }
+
+function showGameUI(on) {
+  byId('hud').classList.toggle('hidden', !on);
+  byId('chars').classList.toggle('hidden', !on);
+  byId('logbox').classList.toggle('hidden', !on);
+  byId('panel').classList.toggle('hidden', !on);
+}
+
+function barRow(icon, val, cls, warn) {
+  return '<div class="bar ' + cls + '"><span class="bicon">' + icon + '</span><div class="track"><div class="fill' + (warn ? ' bad' : '') + '" style="width:' + clamp(val, 0, 100) + '%"></div></div><span class="bval">' + Math.round(val) + '</span></div>';
+}
+
+function charCard(c) {
+  let chips = '';
+  if (c.dead) { chips = '<span class="chip">LOST \u00b7 DAY ' + c.deathDay + '</span>'; }
+  else {
+    if (c.sick) chips += '<span class="chip">ILL</span>';
+    if (c.injured) chips += '<span class="chip">WOUNDED</span>';
+    if (c.depressed) chips += '<span class="chip">BROKEN</span>';
+    if (G.phase === 'day' && G.assign[c.id]) chips += '<span class="chip neutral">' + ACTION_BY_ID[G.assign[c.id]].name.toUpperCase() + '</span>';
+  }
+  return '<div class="card hand' + (c.dead ? ' dead' : '') + '">' +
+    '<div class="cc-head"><span class="cc-name">' + c.name + '</span><span class="cc-role">' + c.age + ' \u00b7 ' + c.role.toUpperCase() + '</span></div>' +
+    (c.dead ? '' :
+      barRow(ICONS.health, c.hp, 'b-hp', c.hp <= 25) +
+      barRow(ICONS.hunger, c.hunger, 'b-hu', c.hunger >= 80) +
+      barRow(ICONS.morale, c.morale, 'b-mo', c.morale < 20)) +
+    '<div class="chips">' + chips + '</div>' +
+    '</div>';
+}
+
+function childCard() {
+  const ch = G.child;
+  let chips = '';
+  if (ch.sick) chips += '<span class="chip">ILL</span>';
+  if (ch.hunger >= 80) chips += '<span class="chip">STARVING</span>';
+  return '<div class="card hand"><div class="cc-head"><span class="cc-name">Nika</span><span class="cc-role">9 \u00b7 HIDING UPSTAIRS</span></div>' +
+    barRow(ICONS.health, ch.hp, 'b-hp', ch.hp <= 25) +
+    barRow(ICONS.hunger, ch.hunger, 'b-hu', ch.hunger >= 80) +
+    '<div class="chips">' + chips + '</div></div>';
+}
+
+function renderHUD() {
+  byId('hud-day').textContent = 'DAY ' + G.day;
+  byId('hud-phase').textContent = '\u00b7 ' + phaseName();
+  const r = G.res;
+  byId('hud-res').innerHTML =
+    '<span>' + ICONS.food + r.food + '</span><span>' + ICONS.meds + r.meds + '</span><span>' + ICONS.parts + r.parts + '</span><span>' + ICONS.tools + r.tools + '</span><span>' + ICONS.shelter + r.shelter + '</span>';
+  const box = byId('chars');
+  let h = '';
+  G.chars.forEach(function (c) { h += charCard(c); });
+  if (G.child) h += childCard();
+  box.innerHTML = h;
+}
+
+function renderLog() {
+  const ul = byId('log');
+  if (!ul) return;
+  const last = G.log.slice(-5);
+  ul.innerHTML = last.map(function (s) { return '<li>' + s + '</li>'; }).join('');
+}
+
+/* ---------------- panels ---------------- */
+function renderPanel() {
+  const p = byId('panel');
+  showGameUI(true);
+  p.innerHTML = '';
+  switch (G.phase) {
+    case 'day': renderDayPanel(p); break;
+    case 'dayResult': renderLinesPanel(p, G.lastLines, 'THE AFTERNOON', 'DUSK COMES', startDusk); break;
+    case 'dusk': renderDuskPanel(p); break;
+    case 'duskResult': renderLinesPanel(p, G.lastLines, 'WHAT WAS DONE', 'NIGHT FALLS', afterDuskContinue); break;
+    case 'night': renderNightPanel(p); break;
+    case 'nightResult': renderLinesPanel(p, G.lastLines, 'BEFORE FIRST LIGHT', 'DAWN', function () { newDay(G.day + 1); }); break;
+  }
+  renderHUD();
+}
+
+const INTRO = 'The city has been dying for a year. You have been living inside its corpse for 214 days \u2014 three floors of a half-ruined house, three names on a door that barely locks. Scavenge by night. Mend by day. Decide, at dusk, who you are.';
+
+function renderDayPanel(p) {
+  let h = '<div class="p-title">DAY ' + G.day + ' \u2014 MORNING</div>';
+  if (G.day <= 2) h += '<div class="p-note">' + INTRO + '</div>';
+  h += '<div class="p-note">One task for each survivor. What is not repaired, rusts. What is not eaten, bites.</div>';
+  h += '<div class="day-cols">';
+  alive().forEach(function (c) {
+    h += '<div class="day-col"><h4>' + c.name + '</h4>';
+    ACTIONS.forEach(function (a) {
+      const ok = a.can();
+      const sel = G.assign[c.id] === a.id;
+      h += '<button class="choice hand' + (sel ? ' sel' : '') + '" data-act="assign" data-arg="' + c.id + ':' + a.id + '"' + (ok ? '' : ' disabled') + '><span class="c-label">' + a.name + '</span>' +
+        (!ok && a.need ? '<span class="c-hint">' + a.need + '</span>' : (a.hint ? '<span class="c-hint">' + a.hint + '</span>' : '')) + '</button>';
+    });
+    h += '</div>';
+  });
+  h += '</div>';
+  const all = alive().every(function (c) { return !!G.assign[c.id]; });
+  h += '<div style="text-align:center"><button class="p-continue hand" data-act="endday"' + (all ? '' : ' disabled') + '>END THE DAY</button></div>';
+  p.innerHTML = h;
+}
+
+function renderDuskPanel(p) {
+  const ev = EV_BY_ID[G.duskEventId];
+  if (!ev) { p.innerHTML = '<div class="p-text">The dusk passes quietly.</div><div style="text-align:center"><button class="p-continue hand" data-act="cont">NIGHT FALLS</button></div>'; Flow.btn = startNight; return; }
+  let h = '';
+  if (G.supperLines.length) h += '<div class="p-note">' + G.supperLines.join(' ') + '</div>';
+  h += '<div class="p-title">' + ev.title.toUpperCase() + '</div>';
+  h += '<div class="p-text">' + ev.text() + '</div>';
+  h += '<div class="choices">';
+  ev.choices.forEach(function (c, i) {
+    const ok = !c.cond || c.cond();
+    h += '<button class="choice hand" data-act="dusk" data-arg="' + i + '"' + (ok ? '' : ' disabled') + '><span class="c-label">' + c.label + '</span>' + (c.hint ? '<span class="c-hint">' + c.hint + '</span>' : '') + '</button>';
+  });
+  h += '</div>';
+  p.innerHTML = h;
+}
+
+function renderLinesPanel(p, lines, title, btnLabel, fn) {
+  Flow.btn = fn;
+  let h = '<div class="p-title">' + title + '</div>';
+  (lines || []).forEach(function (l) { h += '<div class="p-line">' + l + '</div>'; });
+  h += '<div style="text-align:center"><button class="p-continue hand" data-act="cont">' + btnLabel + '</button></div>';
+  p.innerHTML = h;
+  p.scrollTop = 0;
+}
+
+const LOC_HINT = {
+  vera: 'hospitals are her ground',
+  marko: 'checkpoints are his ground',
+  anya: 'houses are her ground'
+};
+
+function renderNightPanel(p) {
+  const n = G.night;
+  if (!n) { Flow.btn = function () { newDay(G.day + 1); }; renderLinesPanel(p, G.lastLines, 'BEFORE FIRST LIGHT', 'DAWN', function () { newDay(G.day + 1); }); return; }
+  let h = '';
+  if (n.stage === 'who') {
+    h += '<div class="p-title">NIGHT ' + G.day + ' \u2014 WHO GOES OUT?</div>';
+    h += '<div class="p-note">One goes out. The others stay. What stays behind is not always safe either.</div><div class="choices">';
+    alive().forEach(function (c) {
+      h += '<button class="choice hand" data-act="who" data-arg="' + c.id + '"><span class="c-label">' + c.name + '</span><span class="c-hint">' + c.role + (c.depressed ? ' · hands shaking' : '') + (LOC_HINT[c.id] ? ' · ' + LOC_HINT[c.id] : '') + '</span></button>';
+    });
+    h += '<button class="choice hand" data-act="nogo"><span class="c-label">No one goes tonight.</span><span class="c-hint">fear gnaws · the house is unwatched from outside</span></button>';
+    h += '</div>';
+  } else if (n.stage === 'loc') {
+    const w = getChar(n.who);
+    h += '<div class="p-title">WHERE DOES ' + (w ? w.name.toUpperCase() : 'NO ONE') + ' GO?</div><div class="choices">';
+    Object.keys(LOCS).forEach(function (id) {
+      h += '<button class="choice hand" data-act="loc" data-arg="' + id + '"><span class="c-label">' + LOCS[id].name + '</span><span class="c-hint">' + LOCS[id].risk + '</span></button>';
+    });
+    h += '</div>';
+  } else if (n.stage === 'scene') {
+    const L = currentLoc();
+    h += '<div class="p-title">' + L.name.toUpperCase() + '</div><div class="p-text">' + L.intro + '</div><div class="choices">';
+    L.choices().forEach(function (c, i) {
+      const ok = !c.cond || c.cond();
+      h += '<button class="choice hand" data-act="nchoice" data-arg="' + i + '"' + (ok ? '' : ' disabled') + '><span class="c-label">' + c.label + '</span>' + (c.hint ? '<span class="c-hint">' + c.hint + '</span>' : '') + '</button>';
+    });
+    h += '</div>';
+  } else if (n.stage === 'encounter') {
+    h += '<div class="p-title">CAUGHT IN THE LIGHT</div><div class="p-text">' + CK_ENC.text + '</div><div class="choices">';
+    CK_ENC.choices(scavenger()).forEach(function (c, i) {
+      const ok = !c.cond || c.cond();
+      h += '<button class="choice hand" data-act="echoice" data-arg="' + i + '"' + (ok ? '' : ' disabled') + '><span class="c-label">' + c.label + '</span>' + (c.hint ? '<span class="c-hint">' + c.hint + '</span>' : '') + '</button>';
+    });
+    h += '</div>';
+  } else if (LOCS[n.loc] && LOCS[n.loc].stages && LOCS[n.loc].stages[n.stage]) {
+    const st = LOCS[n.loc].stages[n.stage];
+    h += '<div class="p-text">' + st.text + '</div><div class="choices">';
+    st.choices().forEach(function (c, i) {
+      const ok = !c.cond || c.cond();
+      h += '<button class="choice hand" data-act="nchoice" data-arg="' + i + '"' + (ok ? '' : ' disabled') + '><span class="c-label">' + c.label + '</span>' + (c.hint ? '<span class="c-hint">' + c.hint + '</span>' : '') + '</button>';
+    });
+    h += '</div>';
+  } else {
+    Flow.btn = function () { newDay(G.day + 1); };
+    renderLinesPanel(p, G.lastLines, 'BEFORE FIRST LIGHT', 'DAWN', function () { newDay(G.day + 1); });
+    return;
+  }
+  p.innerHTML = h;
+  p.scrollTop = 0;
+}
+
+/* ---------------- panel actions (single delegated listener) ---------------- */
+const PanelActions = {
+  assign: function (arg) { const pr = arg.split(':'); G.assign[pr[0]] = pr[1]; renderPanel(); },
+  endday: function () { applyDayActions(); },
+  cont: function () { if (Flow.btn) { const f = Flow.btn; Flow.btn = null; f(); } },
+  dusk: function (i) { resolveDusk(parseInt(i, 10)); },
+  who: function (id) { nightChooseWho(id); },
+  nogo: function () { nightNoOne(); },
+  loc: function (id) { nightChooseLoc(id); },
+  nchoice: function (i) { nightDoChoice(parseInt(i, 10)); },
+  echoice: function (i) { nightEncounterChoice(parseInt(i, 10)); }
+};
+
+function panelClick(ev) {
+  const t = ev.target.closest ? ev.target.closest('[data-act]') : null;
+  if (!t) return;
+  Snd.blip();
+  const act = t.getAttribute('data-act');
+  if (t.disabled) return;
+  if (PanelActions[act]) PanelActions[act](t.getAttribute('data-arg'));
+}
+
+/* ---------------- death & ending screens ---------------- */
+function showDeathScreen(ch) {
+  showGameUI(false);
+  byId('death-name').textContent = ch.name.toUpperCase();
+  byId('death-sub').textContent = ch.age + ' \u00b7 ' + ch.role.toUpperCase() + ' \u00b7 DAY ' + ch.deathDay + ' \u2014 ' + ch.cause.toUpperCase();
+  byId('death-line').textContent = '\u201c' + MEMORIAL[ch.id] + '\u201d';
+  showScreen('death');
+}
+
+function humanityLabel() {
+  const h = G.humanity;
+  if (h >= 75) return 'nearly whole';
+  if (h >= 55) return 'bruised, but human';
+  if (h >= 40) return 'cracked';
+  return 'hollowed out';
+}
+
+function showEnding(forcedId) {
+  const id = forcedId || computeEndingId();
+  const E = ENDINGS[id];
+  const body = byId('ending-body');
+  let h = '<div class="end-title">' + E.title + '</div>';
+  E.body().forEach(function (par) { h += '<p>' + par + '</p>'; });
+  const eps = arcEpilogues();
+  if (eps.length) {
+    h += '<div class="er-title">WHATEVER BECAME OF THEM</div>';
+    eps.forEach(function (s) { h += '<p>' + s + '</p>'; });
+  }
+  h += '<div class="er-title">THE SURVIVORS</div>';
+  G.chars.forEach(function (c) {
+    h += '<div class="surv-item' + (c.dead ? ' dead' : '') + '"><b>' + c.name + '</b>, ' + c.age + ' \u2014 ' + c.role.toLowerCase() + ' \u2014 ' +
+      (c.dead ? ('did not make it. Day ' + c.deathDay + ': ' + c.cause + '. \u201c' + MEMORIAL[c.id] + '\u201d') : ('survived. health ' + Math.round(c.hp) + ' \u00b7 hunger ' + Math.round(c.hunger) + ' \u00b7 morale ' + Math.round(c.morale) + '.')) + '</div>';
+  });
+  h += '<div class="surv-item"><b>What the war left of us:</b> ' + humanityLabel() + ' (' + Math.round(G.humanity) + '/100).</div>';
+  if (G.decisions.length) {
+    h += '<div class="er-title">THE RECORD \u2014 ' + G.decisions.length + ' decisions</div>';
+    G.decisions.forEach(function (d) { h += '<div class="er-item">DAY ' + d.d + ' \u2014 ' + d.t + '</div>'; });
+  }
+  h += '<div class="end-closing">' + E.closing + '</div>';
+  h += '<div class="end-closing" style="margin-top:8px;color:#6a6456;font-size:12px;letter-spacing:4px">IN WAR, NO ONE WINS.</div>';
+  h += '<div class="end-btns"><button class="hand" data-eact="new">NEW GAME</button><button class="hand" data-eact="menu">MAIN MENU</button></div>';
+  body.innerHTML = h;
+  showGameUI(false);
+  showScreen('ending');
+  clearSave();
+  Snd.setScene('menu');
+  FX.mode = 'dusk';
+}
+
+/* ---------------- fade ---------------- */
+const fadeTimers = [];
+function fadeTo(text, mid) {
+  const f = byId('fade'), ft = byId('fade-text');
+  ft.textContent = text || '';
+  f.style.opacity = '1';
+  fadeTimers.push(setTimeout(function () {
+    if (mid) mid();
+    fadeTimers.push(setTimeout(function () { f.style.opacity = '0'; }, 350));
+  }, 800));
+}
+
+/* ---------------- menu / game entry ---------------- */
+function refreshMenu() { byId('btn-continue').disabled = !hasSave(); }
+function updateMuteLabel() { byId('btn-mute').textContent = G.settings.muted ? 'sound: off' : 'sound: on'; }
+
+function initCharPos() {
+  FX.chars = {};
+  G.chars.forEach(function (c, i) { FX.chars[c.id] = { x: 400 + i * 50, y: 596 }; });
+}
+
+function newGame() {
+  G = freshState();
+  initCharPos();
+  hideScreens();
+  showGameUI(false);
+  FX.mode = 'day';
+  Snd.setScene('day');
+  fadeTo('DAY 1', function () { showGameUI(true); renderPanel(); });
+  saveGame();
+}
+
+function continueGame() {
+  if (!loadGame()) { refreshMenu(); return; }
+  if (G.night && (G.night.stage === 'encounter' || (G.night.loc && LOCS[G.night.loc] && LOCS[G.night.loc].stages && LOCS[G.night.loc].stages[G.night.stage]))) {
+    G.night.stage = 'scene';
+  }
+  initCharPos();
+  FX.mode = G.phase === 'night' || G.phase === 'nightResult' ? 'night' : (G.phase === 'dusk' || G.phase === 'duskResult' ? 'dusk' : 'day');
+  Snd.setScene(FX.mode);
+  hideScreens();
+  fadeTo('DAY ' + G.day, function () { showGameUI(true); renderPanel(); });
+}
+
+function toMenu() {
+  if (!G.flags.escaped && !G.flags.ceasefireDone && aliveCount() > 0) saveGame(); else clearSave();
+  showGameUI(false);
+  showScreen('menu');
+  refreshMenu();
+  FX.mode = 'menu';
+  Snd.setScene('menu');
+}
+
+/* ================================================================
+   CANVAS — charcoal house cross-section, silhouettes, weather
+   ================================================================ */
+const HEIGHTS = { vera: 54, marko: 60, anya: 47 };
+const WALKF = [
+  { la: 0.55, ra: -0.55, lk: 0.15, rk: -0.15 },
+  { la: 0.28, ra: -0.28, lk: 0.30, rk: -0.30 },
+  { la: 0.06, ra: -0.06, lk: 0.12, rk: -0.12 },
+  { la: -0.55, ra: 0.55, lk: -0.15, rk: 0.15 },
+  { la: -0.28, ra: 0.28, lk: -0.30, rk: 0.30 },
+  { la: -0.06, ra: 0.06, lk: -0.12, rk: 0.12 }
+];
+
+let canvas = null, ctx = null;
+const VIEW = { s: 1, ox: 0, oy: 0 };
+let GRAINPAT = null;
+const DUST = [], RAIN = [];
+const SKY_B = [];
+
+function jit(a, b) { const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return (s - Math.floor(s)) * 2 - 1; }
+
+function roughLine(x1, y1, x2, y2, seed, amp) {
+  amp = amp || 1.6;
+  ctx.beginPath();
+  ctx.moveTo(x1 + jit(seed, 1) * amp, y1 + jit(seed, 2) * amp);
+  ctx.lineTo((x1 + x2) / 2 + jit(seed, 3) * amp, (y1 + y2) / 2 + jit(seed, 4) * amp);
+  ctx.lineTo(x2 + jit(seed, 5) * amp, y2 + jit(seed, 6) * amp);
+  ctx.stroke();
+}
+function roughRect(x, y, w, h, seed, amp) {
+  roughLine(x, y, x + w, y, seed, amp);
+  roughLine(x + w, y, x + w, y + h, seed + 1, amp);
+  roughLine(x + w, y + h, x, y + h, seed + 2, amp);
+  roughLine(x, y + h, x, y, seed + 3, amp);
+}
+
+function buildGrain() {
+  const gc = document.createElement('canvas');
+  gc.width = 180; gc.height = 180;
+  const g2 = gc.getContext('2d');
+  for (let i = 0; i < 3200; i++) {
+    g2.fillStyle = 'rgba(255,255,255,' + (Math.random() * 0.07) + ')';
+    g2.fillRect(Math.random() * 180, Math.random() * 180, 1, 1);
+  }
+  for (let i = 0; i < 2400; i++) {
+    g2.fillStyle = 'rgba(0,0,0,' + (Math.random() * 0.08) + ')';
+    g2.fillRect(Math.random() * 180, Math.random() * 180, 1, 1);
+  }
+  GRAINPAT = ctx.createPattern(gc, 'repeat');
+}
+
+function buildSkyline() {
+  SKY_B.length = 0;
+  let x = -40;
+  while (x < 1320) {
+    if (x > 220 && x < 800) { x = 800; continue; } // gap behind the house
+    const w = randi(60, 150);
+    const segs = [];
+    const n = Math.max(3, Math.round(w / 16));
+    const baseH = randi(150, 330);
+    for (let i = 0; i < n; i++) segs.push(baseH + randi(-40, 60));
+    const win = [];
+    for (let i = 0; i < 5; i++) {
+      if (chance(0.5)) win.push({ dx: rand(8, w - 8), dy: rand(30, baseH - 20), ph: rand(0, 6.28) });
+    }
+    SKY_B.push({ x: x, w: w, segs: segs, win: win });
+    x += w + randi(6, 40);
+  }
+}
+
+function makeParticles() {
+  DUST.length = 0; RAIN.length = 0;
+  for (let i = 0; i < 42; i++) DUST.push({ x: rand(0, 1280), y: rand(0, 620), sp: rand(2, 7), ph: rand(0, 6.28), r: rand(0.6, 1.8) });
+  for (let i = 0; i < 95; i++) RAIN.push({ x: rand(-40, 1320), y: rand(0, 720), s: rand(380, 620), l: rand(10, 22) });
+}
+
+function resize() {
+  if (!canvas) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.floor(window.innerWidth * dpr);
+  canvas.height = Math.floor(window.innerHeight * dpr);
+  canvas.style.width = window.innerWidth + 'px';
+  canvas.style.height = window.innerHeight + 'px';
+  VIEW.s = Math.min(canvas.width / 1280, canvas.height / 720);
+  VIEW.ox = (canvas.width - 1280 * VIEW.s) / 2;
+  VIEW.oy = (canvas.height - 720 * VIEW.s) / 2;
+}
+
+/* ---------------- scene pieces ---------------- */
+function drawSkyline(t) {
+  const m = FX.mode;
+  const col = m === 'day' ? '#37362f' : (m === 'dusk' ? '#2c2620' : '#0d1119');
+  ctx.fillStyle = col;
+  SKY_B.forEach(function (b) {
+    ctx.beginPath();
+    ctx.moveTo(b.x, 600);
+    b.segs.forEach(function (h, i) { ctx.lineTo(b.x + i * (b.w / b.segs.length), 600 - h); });
+    ctx.lineTo(b.x + b.w, 600);
+    ctx.closePath();
+    ctx.fill();
+    if (m !== 'day') {
+      b.win.forEach(function (wn) {
+        const a = 0.25 + Math.sin(t * 2 + wn.ph) * 0.12;
+        ctx.fillStyle = 'rgba(205,150,60,' + a.toFixed(3) + ')';
+        ctx.fillRect(b.x + wn.dx, 600 - wn.dy, 2.5, 3.5);
+        ctx.fillStyle = col;
+      });
+    }
+  });
+}
+
+function drawMoon(t) {
+  ctx.save();
+  const g = ctx.createRadialGradient(1060, 160, 10, 1060, 160, 90);
+  g.addColorStop(0, 'rgba(210,218,230,0.35)');
+  g.addColorStop(1, 'rgba(210,218,230,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(960, 60, 200, 200);
+  ctx.fillStyle = 'rgba(212,218,228,0.85)';
+  ctx.beginPath(); ctx.arc(1060, 160, 24, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(160,170,185,0.5)';
+  ctx.beginPath(); ctx.arc(1052, 154, 5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(1068, 168, 3.4, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+function windowFill() {
+  const m = FX.mode;
+  return m === 'day' ? '#a09a8c' : (m === 'dusk' ? '#5a4c3c' : '#141d2f');
+}
+
+function drawHouse(t) {
+  const m = FX.mode;
+  const wallC = m === 'day' ? '#101010' : (m === 'dusk' ? '#0d0b09' : '#04060b');
+  const fillC = m === 'day' ? '#7d786b' : (m === 'dusk' ? '#54473b' : '#232c3c');
+  const darkFill = m === 'day' ? '#6b665a' : (m === 'dusk' ? '#463b31' : '#1a2231');
+  const baseFill = m === 'day' ? '#57534a' : (m === 'dusk' ? '#332b24' : '#121826');
+  const earthC = m === 'day' ? '#3f3c36' : (m === 'dusk' ? '#262019' : '#0a0d14');
+
+  /* earth */
+  ctx.fillStyle = earthC;
+  ctx.fillRect(0, 600, 1280, 120);
+  /* interiors */
+  ctx.fillStyle = fillC;   ctx.fillRect(284, 484, 452, 112);
+  ctx.fillStyle = darkFill; ctx.fillRect(284, 388, 452, 88);
+  ctx.fillStyle = darkFill; ctx.fillRect(284, 308, 452, 68);
+  ctx.fillStyle = baseFill; ctx.fillRect(284, 608, 452, 56);
+
+  ctx.strokeStyle = wallC; ctx.lineCap = 'round';
+  ctx.lineWidth = 5;
+  /* outer walls */
+  roughLine(280, 380, 280, 600, 11);
+  roughLine(740, 380, 740, 600, 12);
+  /* slabs */
+  ctx.lineWidth = 4;
+  roughLine(280, 480, 740, 480, 13);
+  roughLine(280, 382, 740, 382, 14);
+  roughLine(280, 604, 740, 604, 15);
+  roughLine(284, 664, 736, 664, 16);
+  /* ground line */
+  ctx.lineWidth = 4;
+  roughLine(180, 600, 1120, 600, 17, 2);
+  /* room dividers with door gaps */
+  ctx.lineWidth = 4;
+  roughLine(430, 484, 430, 534, 18); roughLine(430, 558, 430, 596, 19);
+  roughLine(520, 388, 520, 428, 20); roughLine(520, 450, 520, 476, 21);
+  /* windows */
+  ctx.fillStyle = windowFill();
+  ctx.fillRect(315, 515, 60, 45);
+  ctx.fillRect(315, 405, 50, 45);
+  ctx.fillRect(645, 405, 50, 45);
+  ctx.fillRect(338, 618, 44, 30);
+  ctx.strokeStyle = wallC; ctx.lineWidth = 3;
+  roughRect(315, 515, 60, 45, 31, 1.2);
+  roughRect(315, 405, 50, 45, 32, 1.2);
+  roughRect(645, 405, 50, 45, 33, 1.2);
+  roughRect(338, 618, 44, 30, 34, 1);
+  /* broken glass shards */
+  roughLine(322, 410, 356, 446, 35, 3);
+  roughLine(688, 410, 660, 444, 36, 3);
+  /* boarded kitchen window */
+  ctx.lineWidth = 5;
+  roughLine(310, 522, 382, 552, 37, 1);
+  roughLine(310, 550, 382, 522, 38, 1);
+  /* door */
+  ctx.lineWidth = 4;
+  roughRect(700, 540, 32, 56, 39, 1);
+  roughLine(726, 566, 726, 592, 40, 0.5);
+  /* roof */
+  ctx.lineWidth = 6;
+  roughLine(250, 384, 438, 258, 41, 2);
+  roughLine(462, 246, 510, 216, 42, 2);
+  roughLine(510, 216, 770, 384, 43, 2);
+  /* chimney with broken top */
+  ctx.lineWidth = 5;
+  roughLine(600, 232, 600, 302, 44, 1);
+  roughLine(628, 240, 628, 302, 45, 1);
+  roughLine(600, 232, 614, 224, 46, 1);
+  roughLine(614, 224, 628, 240, 47, 1);
+  /* furniture */
+  ctx.lineWidth = 3;
+  roughRect(300, 446, 84, 26, 51, 1);
+  roughLine(300, 446, 300, 428, 52, 1);
+  roughRect(515, 446, 86, 26, 53, 1);
+  roughLine(601, 446, 601, 426, 54, 1);
+  roughLine(445, 552, 515, 552, 55, 1);
+  roughLine(452, 552, 452, 594, 56, 1);
+  roughLine(508, 552, 508, 594, 57, 1);
+  roughLine(618, 506, 700, 506, 58, 1);
+  roughLine(624, 506, 624, 516, 59, 1);
+  roughLine(692, 506, 692, 516, 60, 1);
+  /* ladder to the basement */
+  ctx.lineWidth = 3;
+  roughLine(405, 596, 405, 662, 61, 0.8);
+  roughLine(423, 596, 423, 662, 62, 0.8);
+  for (let i = 0; i < 5; i++) roughLine(405, 606 + i * 12, 423, 606 + i * 12, 63 + i, 0.5);
+  /* attic ladder */
+  roughLine(505, 478, 462, 392, 70, 1);
+  roughLine(519, 478, 476, 392, 71, 1);
+  for (let i = 0; i < 5; i++) roughLine(497 - i * 8, 462 - i * 15, 511 - i * 8, 462 - i * 15, 72 + i, 0.5);
+  /* rubble and dead tree outside */
+  ctx.lineWidth = 3;
+  roughLine(800, 598, 830, 566, 80, 2);
+  roughLine(830, 566, 862, 596, 81, 2);
+  roughLine(848, 598, 876, 578, 82, 2);
+  roughLine(876, 578, 900, 598, 83, 2);
+  roughLine(930, 600, 930, 470, 84, 2);
+  roughLine(930, 520, 890, 470, 85, 2);
+  roughLine(930, 496, 968, 440, 86, 2);
+  roughLine(930, 545, 900, 512, 87, 2);
+  for (let i = 0; i < 5; i++) roughLine(790 + i * 60, 600, 790 + i * 60, 566, 90 + i, 1.5);
+  roughLine(786, 576, 1030, 574, 96, 1.5);
+}
+
+function drawBlood() {
+  if (!G.flags.bloodRooms) return;
+  const m = FX.mode;
+  ctx.fillStyle = m === 'day' ? 'rgba(96,22,20,0.55)' : 'rgba(70,14,14,0.5)';
+  G.flags.bloodRooms.forEach(function (rm, i) {
+    const bx = rm === 'kitchen' ? 392 : 466;
+    const by = rm === 'kitchen' ? 590 : 470;
+    ctx.beginPath(); ctx.ellipse(bx, by, 16 + i * 5, 4 + i, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(bx + 14, by - 2, 6, 2.4, 0, 0, Math.PI * 2); ctx.fill();
+  });
+}
+
+function drawCandleGlow(t) {
+  const fx = 480, fy = 546;
+  const fl = 1 + Math.sin(t * 11.3) * 0.12 + Math.sin(t * 23.7) * 0.07 + jit(Math.floor(t * 9), 7.7) * 0.05;
+  const r = 150 * fl;
+  const g = ctx.createRadialGradient(fx, fy, 4, fx, fy, r);
+  g.addColorStop(0, 'rgba(235,170,80,0.32)');
+  g.addColorStop(0.4, 'rgba(200,120,50,0.12)');
+  g.addColorStop(1, 'rgba(200,120,50,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(fx - r, fy - r, r * 2, r * 2);
+  ctx.fillStyle = 'rgba(255,196,100,0.95)';
+  ctx.beginPath();
+  ctx.ellipse(fx, fy - 5, 2.2 + Math.sin(t * 13) * 0.6, 5.2 + Math.sin(t * 17.3) * 1.1, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,240,190,0.9)';
+  ctx.beginPath();
+  ctx.ellipse(fx, fy - 4, 1, 2.4, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawFigure(c, x, y, h, t, walking, col, opts) {
+  const f = Math.floor(t * 7) % 6;
+  const wf = WALKF[f];
+  const face = opts.face || 1;
+  const bob = walking ? Math.abs(Math.sin(t * 9)) * 2 : Math.sin(t * 1.6 + x * 0.05) * 1.2;
+  const hipY = y - h * 0.47 - bob;
+  const neckY = y - h * 0.8 - bob;
+  const headR = h * 0.115;
+  c.save();
+  c.strokeStyle = col; c.fillStyle = col;
+  c.lineWidth = Math.max(2.2, h * 0.075); c.lineCap = 'round'; c.lineJoin = 'round';
+  const legLen = h * 0.5, armLen = h * 0.34;
+  const drawLeg = function (ang, bend) {
+    const kx = x + Math.sin(ang) * legLen * 0.55 * face, ky = hipY + Math.cos(ang) * legLen * 0.55;
+    const fx2 = kx + Math.sin(ang + bend) * legLen * 0.45 * face, fy2 = ky + Math.cos(ang + bend) * legLen * 0.45;
+    c.beginPath(); c.moveTo(x, hipY); c.lineTo(kx, ky); c.lineTo(fx2, fy2); c.stroke();
+  };
+  const drawArm = function (ang, bend) {
+    const ex = x + Math.sin(ang) * armLen * 0.55 * face, ey = neckY + h * 0.06 + Math.cos(ang) * armLen * 0.55;
+    const hx2 = ex + Math.sin(ang + bend) * armLen * 0.45 * face, hy2 = ey + Math.cos(ang + bend) * armLen * 0.45;
+    c.beginPath(); c.moveTo(x + face, neckY + h * 0.06); c.lineTo(ex, ey); c.lineTo(hx2, hy2); c.stroke();
+  };
+  if (walking) { drawLeg(Math.PI / 2 - wf.la, wf.lk); drawLeg(Math.PI / 2 - wf.ra, wf.rk); drawArm(Math.PI / 2 + wf.ra * 1.2, 0.3); drawArm(Math.PI / 2 + wf.la * 1.2, 0.3); }
+  else { drawLeg(Math.PI / 2 - 0.12, 0.06); drawLeg(Math.PI / 2 + 0.12, 0.06); drawArm(Math.PI / 2 + 0.18, 0.15); drawArm(Math.PI / 2 - 0.18, 0.15); }
+  c.beginPath(); c.moveTo(x, hipY); c.lineTo(x + face * h * 0.02, neckY); c.stroke();
+  c.beginPath(); c.arc(x + face * h * 0.02, neckY - headR * 0.7, headR, 0, Math.PI * 2); c.fill();
+  if (opts.bun) { c.beginPath(); c.arc(x - face * headR * 0.6, neckY - headR * 1.35, headR * 0.45, 0, Math.PI * 2); c.fill(); }
+  if (opts.cap) { c.lineWidth = 3; c.beginPath(); c.moveTo(x + face * headR * 0.9, neckY - headR * 1.15); c.lineTo(x + face * headR * 1.9, neckY - headR * 0.95); c.stroke(); }
+  if (opts.pony) { c.lineWidth = Math.max(1.6, h * 0.045); c.beginPath(); c.moveTo(x - face * headR * 0.7, neckY - headR * 1.1); c.quadraticCurveTo(x - face * headR * 1.8, neckY, x - face * headR * 1.4, neckY + headR * 1.4); c.stroke(); }
+  if (opts.bag) { c.lineWidth = 1.4; c.beginPath(); c.moveTo(x + face * 2, neckY + h * 0.08); c.lineTo(x + face * h * 0.14, hipY + h * 0.05); c.stroke(); c.fillRect(x + face * h * 0.08 - 3, hipY - 2, 9, 7); }
+  c.restore();
+}
+
+function spotFor(ch, idx) {
+  if (!ch || ch.dead) return null;
+  if (G.phase === 'night' && G.night && G.night.stage !== 'done' && G.night.who === ch.id) return null;
+  const a = G.assign[ch.id] || 'idle';
+  if (G.phase === 'day' || G.phase === 'dayResult' || (a === 'guard' && (G.phase === 'night' || G.phase === 'nightResult'))) {
+    if (a === 'rest') return { x: 340, y: 472 };
+    if (a === 'care') return { x: 545, y: 472 };
+    if (a === 'repair') return { x: 668, y: 596 };
+    if (a === 'forage') return { x: 380, y: 664 };
+    if (a === 'craft') return { x: 505, y: 596 };
+    if (a === 'guard') return { x: 712, y: 596 };
+  }
+  return { x: 372 + idx * 58, y: 596 };
+}
+
+function drawChars(t) {
+  const cols = { day: '#131313', dusk: '#0e0c0a', night: '#05060a' };
+  const col = cols[FX.mode] || '#131313';
+  const list = alive();
+  list.forEach(function (c, i) {
+    const p = FX.chars[c.id];
+    if (!p) return;
+    const target = spotFor(c, i);
+    if (!target) return;
+    const walking = Math.abs(target.x - p.x) > 3;
+    const opts = { face: walking ? (target.x >= p.x ? 1 : -1) : 1 };
+    if (c.id === 'vera') { opts.bun = true; opts.bag = true; }
+    if (c.id === 'marko') opts.cap = true;
+    if (c.id === 'anya') opts.pony = true;
+    drawFigure(ctx, p.x, p.y, HEIGHTS[c.id] || 50, t, walking, col, opts);
+  });
+  if (G.child) drawFigure(ctx, 620, 472, 32, t, false, col, { pony: true });
+}
+
+function drawRain(t, dt) {
+  const duskDrizzle = FX.mode === 'dusk';
+  const n = duskDrizzle ? 32 : RAIN.length;
+  ctx.strokeStyle = duskDrizzle ? 'rgba(157,180,208,0.10)' : 'rgba(157,180,208,0.20)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const d = RAIN[i];
+    ctx.moveTo(d.x, d.y);
+    ctx.lineTo(d.x + 6, d.y + d.l);
+  }
+  ctx.stroke();
+}
+
+function drawDust(t) {
+  if (FX.mode === 'night') return;
+  const col = FX.mode === 'day' ? 'rgba(226,220,200,0.10)' : 'rgba(220,205,180,0.08)';
+  ctx.fillStyle = col;
+  DUST.forEach(function (d) {
+    ctx.beginPath();
+    ctx.arc(d.x, d.y + Math.sin(t * 0.7 + d.ph) * 6, d.r, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+/* ---------------- update & loop ---------------- */
+function update(dt) {
+  FX.shake = Math.max(0, FX.shake - dt * 26);
+  const list = alive();
+  list.forEach(function (c, i) {
+    const p = FX.chars[c.id];
+    if (!p) return;
+    const target = spotFor(c, i);
+    if (!target) return;
+    const dx = target.x - p.x, dy = target.y - p.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > 2) {
+      const sp = Math.min(dist, 85 * dt);
+      p.x += dx / dist * sp; p.y += dy / dist * sp;
+    }
+  });
+  DUST.forEach(function (d) { d.x += d.sp * dt; if (d.x > 1300) d.x = -20; });
+  RAIN.forEach(function (d) { d.y += d.s * dt; if (d.y > 740) { d.y = -30; d.x = rand(-40, 1320); } });
+}
+
+function render(t, dt) {
+  if (!ctx) return;
+  const cw = canvas.width, chh = canvas.height;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, cw, chh);
+  let g = ctx.createLinearGradient(0, 0, 0, chh);
+  if (FX.mode === 'day') { g.addColorStop(0, '#4e4c47'); g.addColorStop(1, '#8a857a'); }
+  else if (FX.mode === 'dusk') { g.addColorStop(0, '#3a332e'); g.addColorStop(1, '#6e5c4c'); }
+  else { g.addColorStop(0, '#0a0f1c'); g.addColorStop(1, '#1d2534'); }
+  ctx.fillStyle = g; ctx.fillRect(0, 0, cw, chh);
+  const shX = FX.shake > 0 ? jit(t * 17.3, 4.2) * FX.shake : 0;
+  const shY = FX.shake > 0 ? jit(t * 13.7, 9.1) * FX.shake : 0;
+  ctx.setTransform(VIEW.s, 0, 0, VIEW.s, VIEW.ox + shX * VIEW.s, VIEW.oy + shY * VIEW.s);
+  drawSkyline(t);
+  if (FX.mode !== 'day') drawMoon(t);
+  drawHouse(t);
+  drawBlood();
+  if (FX.mode !== 'day') drawCandleGlow(t);
+  drawChars(t);
+  if (FX.mode !== 'day') drawRain(t, dt);
+  drawDust(t);
+  /* paper grain + vignette in device space */
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  if (GRAINPAT) { ctx.globalAlpha = 0.5; ctx.fillStyle = GRAINPAT; ctx.fillRect(0, 0, cw, chh); ctx.globalAlpha = 1; }
+  const vg = ctx.createRadialGradient(cw / 2, chh * 0.45, Math.min(cw, chh) * 0.35, cw / 2, chh * 0.5, Math.max(cw, chh) * 0.75);
+  vg.addColorStop(0, 'rgba(0,0,0,0)');
+  vg.addColorStop(1, 'rgba(0,0,0,0.45)');
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, cw, chh);
+}
+
+let lastTs = 0;
+function loop(ts) {
+  const t = ts / 1000;
+  const dt = lastTs ? Math.min(0.05, (ts - lastTs) / 1000) : 0.016;
+  lastTs = ts;
+  update(dt);
+  render(t, dt);
+  requestAnimationFrame(loop);
+}
+
+/* ================================================================
+   INIT
+   ================================================================ */
+function init() {
+  canvas = byId('scene');
+  ctx = canvas.getContext('2d');
+  resize();
+  buildGrain();
+  buildSkyline();
+  makeParticles();
+  window.addEventListener('resize', resize);
+
+  byId('btn-new').addEventListener('click', function () { Snd.init(); Snd.blip(); newGame(); });
+  byId('btn-continue').addEventListener('click', function () { Snd.init(); Snd.blip(); continueGame(); });
+  byId('btn-about').addEventListener('click', function () { Snd.init(); Snd.blip(); showScreen('about'); });
+  byId('btn-about-back').addEventListener('click', function () { Snd.blip(); showScreen('menu'); refreshMenu(); });
+  byId('btn-mute').addEventListener('click', function () { Snd.init(); Snd.toggleMute(); updateMuteLabel(); });
+  byId('btn-menu').addEventListener('click', function () { Snd.blip(); toMenu(); });
+  byId('death-continue').addEventListener('click', function () { Snd.blip(); hideScreens(); Death.continueFlow(); });
+  byId('panel').addEventListener('click', panelClick);
+  byId('screen-ending').addEventListener('click', function (ev) {
+    const t = ev.target && ev.target.closest ? ev.target.closest('[data-eact]') : null;
+    if (!t) return;
+    Snd.blip();
+    if (t.getAttribute('data-eact') === 'new') newGame(); else toMenu();
+  });
+  document.addEventListener('pointerdown', function () { Snd.init(); Snd.resume(); });
+
+  refreshMenu();
+  updateMuteLabel();
+  requestAnimationFrame(loop);
+  setTimeout(function () { byId('fade').style.opacity = '0'; }, 350);
+}
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+else init();
+
+})();
+
+</script>
+</body>
+</html>
